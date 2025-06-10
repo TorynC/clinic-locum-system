@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 250 100% 99%;
+    --foreground: 270 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 270 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 270 10% 15%;
+
+    --primary: 265 89% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 270 100% 96%;
+    --secondary-foreground: 265 89% 50%;
+
+    --muted: 270 10% 96%;
+    --muted-foreground: 270 10% 40%;
+
+    --accent: 270 100% 96%;
+    --accent-foreground: 265 89% 50%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 270 10% 90%;
+    --input: 270 10% 90%;
+    --ring: 265 89% 50%;
+
+    --radius: 0.5rem;
+
+    --sidebar: 0 0% 100%;
+    --sidebar-foreground: 270 10% 15%;
+    --sidebar-border: 270 10% 90%;
+    --sidebar-accent: 270 100% 96%;
+    --sidebar-accent-foreground: 265 89% 50%;
+    --sidebar-ring: 265 89% 50%;
+  }
+
+  .dark {
+    --background: 270 25% 10%;
+    --foreground: 0 0% 95%;
+
+    --card: 270 25% 12%;
+    --card-foreground: 0 0% 95%;
+
+    --popover: 270 25% 12%;
+    --popover-foreground: 0 0% 95%;
+
+    --primary: 265 89% 70%;
+    --primary-foreground: 270 25% 10%;
+
+    --secondary: 270 25% 16%;
+    --secondary-foreground: 0 0% 95%;
+
+    --muted: 270 25% 16%;
+    --muted-foreground: 270 10% 70%;
+
+    --accent: 270 25% 16%;
+    --accent-foreground: 0 0% 95%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 95%;
+
+    --border: 270 25% 20%;
+    --input: 270 25% 20%;
+    --ring: 265 89% 70%;
+
+    --sidebar: 270 25% 12%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-border: 270 25% 20%;
+    --sidebar-accent: 270 25% 16%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-ring: 265 89% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.calendar-day {
+  min-height: 6rem;
+  transition: all 0.2s ease;
+}
+
+.calendar-day:hover {
+  box-shadow: 0 0 0 2px theme("colors.purple.300");
+  z-index: 10;
+}
+
+.calendar-event {
+  @apply rounded-md px-2 py-1 text-xs font-medium truncate cursor-pointer;
+  transition: all 0.2s ease;
+}
+
+.calendar-event:hover {
+  transform: translateY(-1px);
+}
+
+.bottom-nav-item {
+  @apply flex flex-col items-center justify-center text-xs font-medium;
+}
+
+.bottom-nav-item.active {
+  @apply text-purple-600;
+}

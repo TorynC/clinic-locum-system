@@ -18,7 +18,7 @@ import { formatISO } from "date-fns"
 import { useRouter } from "next/navigation";
 import axios from "axios"
 
-export default function PostJobPage() {
+export default function EditJobPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [date, setDate] = useState<Date>()
   const [qualifications, setQualifications] = useState<string[]>([]);
@@ -45,7 +45,10 @@ export default function PostJobPage() {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [shiftStart, setShiftStart] = useState<string>("09:00");
   const [shiftEnd, setShiftEnd] = useState<string>("20:00");
+  const [status, setStatus] = useState("");
+  const [jobId, setJobId] = useState("");
   const router = useRouter();
+  const [jobs, setJobs] = useState<any[]>([]);
 
   const qualificationOptions: Record<string, string> = {
   'General Practice': 'General Consultation',
@@ -117,8 +120,8 @@ export default function PostJobPage() {
     }
   }
 
-  // function to post job 
-  const postJob = async () => {
+  // function to edit job
+  const editJob = async () => {
     const formattedDate = date ? formatISO(date, {representation: "date"}) : null;
     const payLoad = {
       jobTitle,
@@ -149,9 +152,9 @@ export default function PostJobPage() {
     console.log("Payload being sent:", payLoad);
     
     try {
-      const response = await axiosInstance.post(`/post-job/${clinicId}/jobs`, payLoad);
+      const response = await axiosInstance.patch(`/edit-job/${jobId}`, payLoad);
       if (!response.data.error) {
-        console.log("Job posted succcessfully", response.data)  
+        console.log("Job edit succcessful", response.data)  
       }
     } catch (error) {
       if (axios.isAxiosError(error)) {
@@ -174,6 +177,20 @@ export default function PostJobPage() {
     }
   }
 
+  // get jobs
+  const getJobs = async () => {
+    try {
+      const response = await axiosInstance.get(`/get-jobs/${clinicId}/jobs`);
+      if (!response.data.error) {
+        setJobs(response.data.jobs);
+        console.log("retrieved jobs!");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  console.log(jobs);
   
   // function to get clinic preferences
   const getClinicPreferences = async () => {
@@ -207,18 +224,48 @@ export default function PostJobPage() {
       getClinicPreferences();
       getClinicContact();
       getEmail();
+      getJobs();
       }
     }, [clinicId]);
-  
+    console.log(jobId)
+
+  useEffect(() => {
+    if (!jobId) return;
+    const selectedJob = jobs.find(job => String(job.id) === String(jobId));
+    if (selectedJob) {
+        setJobTitle(selectedJob.title)
+        setChosenProcedure(selectedJob.procedure)
+        setJobDescription(selectedJob.description)
+        setJobIncentives(selectedJob.incentives)
+        setDayRate(selectedJob.day_rate)
+        setNightRate(selectedJob.night_rate)
+        setShiftStart(selectedJob.start_time)
+        setShiftEnd(selectedJob.end_time)
+        setPreferredGender(selectedJob.gender)
+        setChosenLanguages(selectedJob.languages)
+        setPreferredDoctors(selectedJob.preferred_doctors_only)
+        setPaidBreak(selectedJob.paid_break)
+        setDate(selectedJob.date)
+        setDayStart(selectedJob.start_day_time)
+        setDayEnd(selectedJob.end_day_time)
+        setNightStart(selectedJob.start_night_time)
+        setNightEnd(selectedJob.end_night_time)
+        setAddress(selectedJob.address)
+        setPhone(selectedJob.phone)
+        setContactPerson(selectedJob.contact)
+        setEmail(selectedJob.email)
+        setSpecialInstructions(selectedJob.special_instructions)
+    }
+  }, [jobId, jobs])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">Post a Locum Job</h1>
-          <p className="text-gray-500">Create a new job posting for locum doctors</p>
+          <h1 className="text-3xl font-bold text-purple-900">Edit an Existing Job</h1>
         </div>
         <div className="flex space-x-2">
-          <Button className="bg-purple-gradient hover:bg-purple-700" onClick={postJob}>Publish Job</Button>
+          <Button className="bg-purple-gradient hover:bg-purple-700" onClick={editJob}>Save Changes</Button>
         </div>
       </div>
 
@@ -229,6 +276,19 @@ export default function PostJobPage() {
             <CardDescription>Basic information about the job</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+
+            <div className="space-y-2">
+              <Label htmlFor="job-id">Existing Job ID</Label>
+              <select
+                id="job-id"
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                value={jobId} onChange={(e) => {setJobId(e.target.value)}}
+              >
+                <option value="">Select Existing Job ID</option>
+                {jobs.map((job) => ((job.id && <option key={job.id} value={job.id}>{job.id}</option>)))}
+              </select>
+            </div>
+            
             <div className="space-y-2">
               <Label htmlFor="job-title">Job Title</Label>
               <Input id="job-title" placeholder="e.g., General Practitioner Locum" 
@@ -474,9 +534,9 @@ export default function PostJobPage() {
           Cancel
         </Button>
         <Button className="gap-2 bg-purple-gradient hover:bg-purple-700" 
-        onClick={postJob}>
+        onClick={editJob}>
           <Save className="h-4 w-4" />
-          Publish Job
+          Save Changes
         </Button>
       </div>
     </div>

@@ -26,6 +26,8 @@ export default function doctorLoginPage() {
       })
 
       console.log("Login successful", response.data);
+      localStorage.setItem("doctorId", response.data.id);
+      
       router.push("/doctor");
     } catch (error) {
       if (axios.isAxiosError(error)) {

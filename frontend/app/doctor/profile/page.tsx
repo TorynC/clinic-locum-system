@@ -10,11 +10,44 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, Upload, X, Plus } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
+import { profile } from "console"
 
 export default function DoctorProfilePage() {
   const [skills, setSkills] = useState(["IM Injection", "Suturing", "Wound Care", "Venipuncture", "ECG"])
   const [languages, setLanguages] = useState(["English", "Malay"])
   const [isVerified, setIsVerified] = useState(true)
+  const [mmcNumber, setMmcNumber] = useState("");
+  const [apcNumber, setApcNumber] = useState("");
+  const [specialization, setSpecialization] = useState("");
+  const [experienceYears, setExperienceYears] = useState(0);
+  const [bio, setBio] = useState("");
+  const [name, setName] = useState("");
+  const [IC, setIC] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [state, setState] = useState("");
+  const [postal, setPostal] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [gender, setGender] = useState("");
+  const [birthday, setBirthday] = useState("");
+  const [minimumPay, setMinimumPay] = useState(0);
+  const [preferredDays, setPreferredDays] = useState<String[]>([])
+  const [earliestStart, setEarliestStart] = useState("");
+  const [latestEnd, setLatestEnd] = useState("");
+  const [maxDistance, setMaxDistance] = useState(0);
+  const [emailNotif, setEmailNotif] = useState(false);
+  const [SMSNotif, setSMSNotif] = useState(false);
+  const [workExperience, setWorkExperience] = useState("");
+  const [bank, setBank] = useState(0);
+  const [profilepic, setProfilepic] = useState<string | null>(null);
+
+  function handlePicChange(e: React.ChangeEvent<HTMLInputElement>) {
+  if (e.target.files && e.target.files[0]) {
+    setProfilepic(URL.createObjectURL(e.target.files[0]));
+  }
+}
+
 
   const removeSkill = (skill: string) => {
     setSkills(skills.filter((s) => s !== skill))
@@ -50,19 +83,33 @@ export default function DoctorProfilePage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center justify-center">
-              <div className="relative">
+            <div className="relative">
                 <div className="w-32 h-32 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-4xl font-medium">
-                  DR
+                  {profilepic && <img className="rounded-full w-30 h-30 border-none" src={profilepic} alt="Upload preview"/>}
                 </div>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-white border-purple-200"
-                >
-                  <Upload className="h-4 w-4" />
-                </Button>
+                <input
+                  id="profile-pic-upload"
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePicChange}
+                />
+                <label htmlFor="profile-pic-upload">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-white border-purple-200 cursor-pointer"
+                    asChild
+                  >
+                    <span>
+                      <Upload className="h-4 w-4" />
+                    </span>
+                  </Button>
+                </label>
               </div>
-              <p className="text-sm text-gray-500 mt-4">Upload a professional photo. It will be visible to clinics.</p>
+              <p className="text-sm text-gray-500 mt-4">
+                Upload a professional photo. It will be visible to clinics.
+              </p>
             </div>
 
             <div className="space-y-2 pt-4">
@@ -87,42 +134,46 @@ export default function DoctorProfilePage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="full-name">Full Name</Label>
-                <Input id="full-name" defaultValue="Dr. Robert Chen" />
+                <Input id="full-name" value={name} onChange={(e) => {setName(e.target.value)}}/>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ic-number">IC Number</Label>
-                <Input id="ic-number" defaultValue="880101-14-5523" />
+                <Input id="ic-number" value={IC} onChange={(e) => {setIC(e.target.value)}} />
               </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="address">Address</Label>
-              <Input id="address" defaultValue="42 Jalan Medic, Taman Kesihatan" />
+              <Input id="address" value={address} onChange={(e) => {setAddress(e.target.value)}} />
             </div>
-
+            <div className="space-y-2">
+                <Label htmlFor="bank-number">Bank Account Number</Label>
+                <Input id="bank" type="number" value={bank} onChange={(e) => {setBank(Number(e.target.value))}}/>
+              </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
-                <Input id="city" defaultValue="Kuala Lumpur" />
+                <Input id="city" value={city} onChange={(e) => {setCity(e.target.value)}} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="state">State</Label>
-                <Input id="state" defaultValue="Wilayah Persekutuan" />
+                <Input id="state" value={state} onChange={(e) => {setState(e.target.value)}} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="postal-code">Postal Code</Label>
-                <Input id="postal-code" defaultValue="50400" />
+                <Input id="postal-code" value={postal} onChange={(e) => {setPostal(e.target.value)}}/>
               </div>
+    
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" type="tel" defaultValue="+60 12-345-6789" />
+                <Input id="phone" type="tel" value={phone} onChange={(e) => {setPhone(e.target.value)}} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                <Input id="email" type="email" defaultValue="dr.robert@example.com" />
+                <Input id="email" type="email" value={email} onChange={(e) => {setEmail(e.target.value)}}/>
               </div>
             </div>
 
@@ -132,7 +183,9 @@ export default function DoctorProfilePage() {
                 <select
                   id="gender"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                  value={gender} onChange={(e) => {setGender(e.target.value)}}
+                > 
+                  <option value="">Select gender...</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
                   <option value="other">Other</option>
@@ -140,7 +193,7 @@ export default function DoctorProfilePage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="dob">Date of Birth</Label>
-                <Input id="dob" type="date" defaultValue="1988-01-01" />
+                <Input id="dob" type="date" value={birthday} onChange={(e) => {setBirthday(e.target.value)}} />
               </div>
             </div>
           </CardContent>
@@ -164,11 +217,11 @@ export default function DoctorProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="mmc-number">MMC Number</Label>
-                  <Input id="mmc-number" defaultValue="MMC-54321" />
+                  <Input id="mmc-number" value={mmcNumber} onChange={(e) => {setMmcNumber(e.target.value)}} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="apc-number">APC Number</Label>
-                  <Input id="apc-number" defaultValue="APC-12345" />
+                  <Input id="apc-number" value={apcNumber} onChange={(e) => {setApcNumber(e.target.value)}} />
                 </div>
               </div>
 
@@ -217,7 +270,9 @@ export default function DoctorProfilePage() {
                 <select
                   id="specialization"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                  value={specialization} onChange={(e) => {setSpecialization(e.target.value)}}
+                > 
+                  <option value="">Select Your Specialization</option>
                   <option value="general">General Practice</option>
                   <option value="pediatrics">Pediatrics</option>
                   <option value="dental">Dental</option>
@@ -228,7 +283,8 @@ export default function DoctorProfilePage() {
 
               <div className="space-y-2">
                 <Label htmlFor="experience">Years of Experience</Label>
-                <Input id="experience" type="number" defaultValue="8" />
+                <Input id="experience" type="number"
+                value={experienceYears} onChange={(e) => {setExperienceYears(Number(e.target.value))}}/>
               </div>
 
               <div className="space-y-2">
@@ -236,7 +292,16 @@ export default function DoctorProfilePage() {
                 <Textarea
                   id="bio"
                   rows={4}
-                  defaultValue="General practitioner with 8 years of experience in primary care and emergency medicine. Passionate about preventive healthcare and patient education."
+                  value={bio} onChange={(e) => {setBio(e.target.value)}}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bio">Work Experience</Label>
+                <Textarea
+                  id="work-experience"
+                  rows={4}
+                  value={workExperience} onChange={(e) => {setWorkExperience(e.target.value)}}
                 />
               </div>
             </CardContent>
@@ -327,7 +392,7 @@ export default function DoctorProfilePage() {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="min-hourly-rate">Minimum Hourly Rate (RM)</Label>
-                <Input id="min-hourly-rate" type="number" defaultValue="80" />
+                <Input id="min-hourly-rate" type="number" value={minimumPay} onChange={(e) => {setMinimumPay(Number(e.target.value))}} />
                 <p className="text-xs text-gray-500">
                   You will only be shown jobs that meet or exceed this hourly rate.
                 </p>
@@ -338,7 +403,16 @@ export default function DoctorProfilePage() {
                 <div className="grid grid-cols-4 gap-2">
                   {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map((day) => (
                     <div key={day} className="flex items-center space-x-2">
-                      <input type="checkbox" id={`day-${day}`} className="h-4 w-4 rounded border-gray-300" />
+                      <input type="checkbox" id={`day-${day}`} className="h-4 w-4 rounded border-gray-300"
+                      checked={preferredDays.includes(day)}
+                      onChange={(e) => {
+                        if(e.target.checked) {
+                          setPreferredDays([...preferredDays, day]);
+                        } else {
+                          setPreferredDays(preferredDays.filter((q) => q !== day))
+                        }
+                      }}
+                      />
                       <Label htmlFor={`day-${day}`}>{day}</Label>
                     </div>
                   ))}
@@ -350,11 +424,11 @@ export default function DoctorProfilePage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="start-time">Earliest Start Time</Label>
-                    <Input id="start-time" type="time" defaultValue="08:00" />
+                    <Input id="start-time" type="time" value={earliestStart} onChange={(e) => {setEarliestStart(e.target.value)}} />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="end-time">Latest End Time</Label>
-                    <Input id="end-time" type="time" defaultValue="20:00" />
+                    <Input id="end-time" type="time" value={latestEnd} onChange={(e) => {setLatestEnd(e.target.value)}} />
                   </div>
                 </div>
               </div>
@@ -362,7 +436,7 @@ export default function DoctorProfilePage() {
               <div className="space-y-2">
                 <Label>Maximum Travel Distance</Label>
                 <div className="flex items-center space-x-2">
-                  <Input id="travel-distance" type="number" defaultValue="25" />
+                  <Input id="travel-distance" type="number" value={maxDistance} onChange={(e) => {setMaxDistance(Number(e.target.value))}} />
                   <span className="text-gray-500">km</span>
                 </div>
                 <p className="text-xs text-gray-500">
@@ -374,17 +448,15 @@ export default function DoctorProfilePage() {
                 <Label>Notification Preferences</Label>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                    <Switch id="email-notifications" defaultChecked />
+                    <Switch id="email-notifications" checked={emailNotif} onCheckedChange={setEmailNotif} />
                     <Label htmlFor="email-notifications">Email notifications for new matching jobs</Label>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Switch id="sms-notifications" defaultChecked />
+                    <Switch id="sms-notifications" checked={SMSNotif} onCheckedChange={setSMSNotif} />
                     <Label htmlFor="sms-notifications">SMS notifications for urgent requests</Label>
                   </div>
                 </div>
               </div>
-
-              <Button className="bg-purple-gradient hover:bg-purple-700">Save Preferences</Button>
             </CardContent>
           </Card>
         </TabsContent>

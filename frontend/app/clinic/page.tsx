@@ -1,43 +1,81 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import Link from "next/link"
-import { Calendar, ClipboardList, Users, Clock } from "lucide-react"
-import axiosInstance from "@/utils/axiosinstance"
-import { useState } from "react"
-import { useEffect } from "react"
+import type React from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import Link from "next/link";
+import { Calendar, ClipboardList, Users, Clock, Trash2 } from "lucide-react";
+import axiosInstance from "@/utils/axiosinstance";
+import { useState } from "react";
+import { useEffect } from "react";
 
 export default function ClinicHomePage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [clinicName, setClinicName] = useState("");
+  const [jobs, setJobs] = useState<any[]>([]);
 
-  //function to get clinic name 
+  // get jobs
+  const getJobs = async () => {
+    try {
+      const response = await axiosInstance.get(`/get-jobs/${clinicId}/jobs`);
+      if (!response.data.error) {
+        setJobs(response.data.jobs);
+        console.log("retrieved jobs!");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  console.log(jobs);
+
+  // function to delete job 
+  const deleteJob = async (id: string) => {
+    try {
+      const response = await axiosInstance.delete(`/delete-job/${id}`);
+      if (!response.data.error) {
+        console.log("Job deleted successfully!")
+        getJobs();
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  //function to get clinic name
   const getClinicName = async () => {
-  try {
-    const response = await axiosInstance.get(`/get-clinic/${clinicId}`);
-    if (!response.data.error) {
-      setClinicName(response.data.clinic.clinic_name); 
-    } 
+    try {
+      const response = await axiosInstance.get(`/get-clinic/${clinicId}`);
+      if (!response.data.error) {
+        setClinicName(response.data.clinic.clinic_name);
+      }
     } catch (error) {
       console.error(error);
     }
   };
 
   useEffect(() => {
-  const storedId = localStorage.getItem("clinicId");
-  if (storedId) {
-    setClinicId(storedId);
+    const storedId = localStorage.getItem("clinicId");
+    if (storedId) {
+      setClinicId(storedId);
     }
   }, []);
 
   useEffect(() => {
-  if (clinicId) {
-    getClinicName();
+    if (clinicId) {
+      getClinicName();
+      getJobs();
     }
   }, [clinicId]);
-
+  
+  
+      
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -56,7 +94,7 @@ export default function ClinicHomePage() {
         <DashboardCard
           icon={<ClipboardList className="h-8 w-8 text-purple-500" />}
           title="Active Jobs"
-          value="5"
+          value={`${jobs.length}`}
           description="Currently open positions"
         />
         <DashboardCard
@@ -88,15 +126,31 @@ export default function ClinicHomePage() {
           <CardContent>
             <div className="space-y-4">
               {[
-                { date: "Today, 9:00 AM - 5:00 PM", doctor: "Dr. Sarah Johnson", type: "General Practice" },
-                { date: "Tomorrow, 10:00 AM - 6:00 PM", doctor: "Dr. Michael Chen", type: "Pediatrics" },
-                { date: "May 15, 8:00 AM - 4:00 PM", doctor: "Pending Applications", type: "Dental" },
+                {
+                  date: "Today, 9:00 AM - 5:00 PM",
+                  doctor: "Dr. Sarah Johnson",
+                  type: "General Practice",
+                },
+                {
+                  date: "Tomorrow, 10:00 AM - 6:00 PM",
+                  doctor: "Dr. Michael Chen",
+                  type: "Pediatrics",
+                },
+                {
+                  date: "May 15, 8:00 AM - 4:00 PM",
+                  doctor: "Pending Applications",
+                  type: "Dental",
+                },
               ].map((shift, i) => (
                 <div
                   key={i}
                   className="flex items-center p-3 border border-purple-100 rounded-lg hover:bg-purple-50 transition-colors"
                 >
-                  <div className={`w-3 h-3 rounded-full mr-3 ${i === 2 ? "bg-amber-500" : "bg-purple-500"}`} />
+                  <div
+                    className={`w-3 h-3 rounded-full mr-3 ${
+                      i === 2 ? "bg-amber-500" : "bg-purple-500"
+                    }`}
+                  />
                   <div>
                     <p className="font-medium">{shift.date}</p>
                     <p className="text-sm text-gray-500">
@@ -111,15 +165,29 @@ export default function ClinicHomePage() {
 
         <Card className="border-purple-100">
           <CardHeader className="pb-2">
-            <CardTitle className="text-purple-900">Recent Applications</CardTitle>
+            <CardTitle className="text-purple-900">
+              Recent Applications
+            </CardTitle>
             <CardDescription>Doctors who applied to your jobs</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               {[
-                { name: "Dr. James Wilson", specialty: "General Practice", experience: "8 years" },
-                { name: "Dr. Emily Patel", specialty: "Pediatrics", experience: "5 years" },
-                { name: "Dr. Robert Kim", specialty: "Dental", experience: "10 years" },
+                {
+                  name: "Dr. James Wilson",
+                  specialty: "General Practice",
+                  experience: "8 years",
+                },
+                {
+                  name: "Dr. Emily Patel",
+                  specialty: "Pediatrics",
+                  experience: "5 years",
+                },
+                {
+                  name: "Dr. Robert Kim",
+                  specialty: "Dental",
+                  experience: "10 years",
+                },
               ].map((doctor, i) => (
                 <div
                   key={i}
@@ -139,9 +207,50 @@ export default function ClinicHomePage() {
             </div>
           </CardContent>
         </Card>
-      </div>
     </div>
-  )
+        <Card className="border-purple-100">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-purple-900">All Upcoming Jobs</CardTitle>
+            <CardDescription>View, Edit, Delete Posted Jobs</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {jobs.slice().sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((job, i) => (
+                <div className="flex items-center justify-between p-3 border border-purple-100 rounded-lg hover:bg-purple-50 transition-colors" key={job.id}>
+                    <div className="flex items-center">
+                      <div className="w-10 h-10 rounded-full bg-purple-100 text-purple-600 mr-3 flex items-center justify-center">
+                        {job.title.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium">{job.title}</p>
+                        <p className="text-sm text-gray-500">
+                          {job.status} • {`Total Pay Before Incentives: RM${job.total_pay}`} • {job.start_time}-{job.end_time} • {new Date(job.date).toLocaleDateString("en-MY", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                            timeZone: "Asia/Kuala_Lumpur",
+                          })} • {`Procedure: ${job.procedure}`} • {`Job ID: ${job.id}`} 
+                        </p>
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-purple-100 flex items-center justify-center w-10 h-10 hover:bg-purple-200 cursor-pointer">
+                      <button
+                          className="rounded-full bg-purple-100 flex items-center justify-center w-10 h-10 hover:bg-purple-200 cursor-pointer border-none outline-none"
+                          onClick={() => deleteJob(job.id)}
+                          aria-label="Delete job"
+                          type="button"
+                          >
+                      <Trash2 className="h-6 w-6 text-purple-500" />
+                    </button>
+                    </div>
+                  </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+  
+  );
 }
 
 function DashboardCard({
@@ -150,10 +259,10 @@ function DashboardCard({
   value,
   description,
 }: {
-  icon: React.ReactNode
-  title: string
-  value: string
-  description: string
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  description: string;
 }) {
   return (
     <Card className="border-purple-100 overflow-hidden">
@@ -169,5 +278,5 @@ function DashboardCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

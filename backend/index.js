@@ -1,3 +1,4 @@
+
 const express = require("express");
 const cors = require("cors");
 const pool = require("./db"); 
@@ -8,6 +9,7 @@ const {authenticateToken} = require("./utilities");
 
 require('dotenv').config();
 
+const allowedOrigins = ['http://localhost:3000', 'http://localhost:3001'];
 
 const PORT = 5000;
 const app = express();
@@ -15,7 +17,7 @@ app.use(express.json());
 app.use(cookieParser())
 app.use(
     cors({
-        origin:"http://localhost:3001",
+        origin:allowedOrigins,
         credentials: true,
     })
 );
@@ -34,6 +36,21 @@ app.get('/api/test-db', async (req, res) => {
         return res.json(error);
     }
 });
+
+// Delete Job 
+app.delete("/api/delete-job/:jobId", authenticateToken, async (req, res) => {
+    try {
+        const jobId = req.params.jobId;
+        if (!jobId) {
+            return res.status(400).json({error: true, message: "Job not found"})
+        }
+        await pool.query("DELETE FROM manual_jobs WHERE id = $1", [jobId])
+        return res.status(200).json({error: false, message: "Job successfully deleted"})
+    } catch (error) {
+        console.error(error)    
+        return res.status(500).json({error: true, message: "Internal Server Error"})
+    }
+})
 
 // Create a new clinic API 
 app.post('/api/clinic-register', async (req, res) => {
@@ -155,7 +172,7 @@ app.post("/api/doctor-login", async (req, res) => {
         const accessToken = jwt.sign({email: doctor.email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
 
         return res.status(200).json({
-            error: false, message: "Login successful", accessToken, email: doctor.email
+            error: false, message: "Login successful", accessToken, email: doctor.email, id: doctor.id
         });
         
     } catch (error) {
@@ -184,6 +201,80 @@ app.patch("/api/general-info/:id", authenticateToken, async (req, res) => {
     } catch (error) {
         console.error(error);
         return res.status(400).json({ error: true, message: "Internal Server Error" });
+    }
+})
+
+// edit job API 
+app.patch("/api/edit-job/:jobId", authenticateToken, async(req, res) => {
+    const { 
+        jobTitle: title,
+        date,
+        chosenLanguages: languages,
+        chosenProcedure: procedure,
+        preferredDoctors: preferred_doctors,
+        address,
+        email,
+        phone,
+        paidBreak: paid_break,
+        totalPay: total_pay,
+        dayRate: day_rate,
+        nightRate: night_rate,
+        dayStart: start_day_time,
+        dayEnd: end_day_time,
+        nightStart: start_night_time,
+        nightEnd: end_night_time,
+        jobDescription: description,
+        jobIncentives: incentives,
+        preferredGender: gender,
+        contactPerson: contact,
+        specialInstructions: special_instructions,
+        shiftStart: start_time,
+        shiftEnd: end_time,
+        status
+    } = req.body;
+
+    try {
+        const jobId = req.params.jobId;
+        if (!jobId) {
+            return res.status(400).json({error: true, message: "Job not found"})
+        }
+        await pool.query(
+            `UPDATE manual_jobs SET
+                title = $1,
+                procedure = $2,
+                description = $3,
+                incentives = $4,
+                day_rate = $5,
+                night_rate = $6,
+                total_pay = $7,
+                date = $8,
+                start_time = $9,
+                end_time = $10,
+                gender = $11,
+                languages = $12,
+                preferred_doctors = $13,
+                paid_break = $14,
+                start_day_time = $15,
+                end_day_time = $16,
+                start_night_time = $17,
+                end_night_time = $18,
+                contact = $19,
+                special_instructions = $20,
+                email = $21,
+                address = $22,
+                phone = $23,
+                status = $24
+            WHERE id = $25`, [title, procedure, description, incentives, day_rate, 
+                night_rate, total_pay, date, start_time, end_time, gender, languages, 
+                preferred_doctors, paid_break, start_day_time, end_day_time, start_night_time, 
+                end_night_time, contact, special_instructions, email, address,
+                phone, status, jobId
+            ]
+        )
+        return res.status(200).json({error: false, message: "Job updated successfully"})
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error: true, message: "Internal Server Error"})
     }
 })
 
@@ -257,24 +348,210 @@ app.patch("/api/name-email/:id", authenticateToken, async (req, res) => {
 
 // Clinic Preferences API Route 
 app.patch("/api/preferences/:id", authenticateToken, async (req, res) => {
-    const {rate, qualifications, languages, preferredDoctorsOnly} = req.body;
+    const {dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors} = req.body;
     try {
         const clinicId = req.params.id;
         if (!clinicId) {
             return res.status(400).json({ error: true, message: "Clinic not found" });
         } 
         await pool.query(`
-            INSERT INTO clinic_preferences (id, rate, qualifications, languages, preferred_doctors_only)
-            VALUES ($1, $2, $3, $4, $5) 
+            INSERT INTO clinic_preferences (id, day_rate, night_rate, day_start_time, day_end_time, night_start_time, night_end_time, qualifications, languages, preferred_doctors_only)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
             ON CONFLICT (id)
-            DO UPDATE SET rate = $2, qualifications = $3, languages = $4, preferred_doctors_only = $5
-            `, [clinicId, rate, qualifications, languages, preferredDoctorsOnly])
-        return res.status(200).json({ error: false, message: "preferences successfully updated", rate, qualifications, languages, preferredDoctorsOnly})
+            DO UPDATE SET day_rate = $2, night_rate = $3, day_start_time = $4, day_end_time = $5, night_start_time = $6, night_end_time = $7, qualifications = $8, languages = $9, preferred_doctors_only = $10
+            `, [clinicId, dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors])
+        return res.status(200).json({ error: false, message: "preferences successfully updated", dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors})
     } catch(error) {
         console.error(error);
         return res.status(400).json({error: true, message: "Internal Server Error"});
     }
 });
+
+// update doctor profile API route 
+app.patch("/api/doctor-profile/:doctorId", authenticateToken, async (req, res) => {
+    const doctorId = req.params.doctorId;
+
+    const {
+        skills, languages, mmcNumber, apcNumber, specialization, experienceYears, bio,
+        name, IC, address, city, state, postal, phone, email, gender, birthday, minimumPay,
+        preferredDays, earliestStart, latestEnd, maxDistance, emailNotif, SMSNotif
+    } = req.body;
+
+    if (!doctorId) {
+        return res.status(400).json({ error: true, message: "No doctor found" });
+    }
+
+    try {
+        const values = [
+            skills, languages, mmcNumber, apcNumber, specialization, experienceYears,
+            bio, name, IC, address, city, state, postal, phone, email, gender, birthday,
+            minimumPay, preferredDays, earliestStart, latestEnd, maxDistance, emailNotif, SMSNotif, doctorId
+        ];
+
+        await pool.query(`
+        INSERT INTO doctor_profile (
+            skills, languages, mmc_number, apc_number, specialization, experience_years,
+            bio, name, ic, address, city, state, postal, phone, email, gender, birthday,
+            minimum_pay, preferred_days, earliest_start, latest_end, max_distance, email_notif, sms_notif, id
+        ) VALUES (
+            $1, $2, $3, $4, $5, $6,
+            $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+            $18, $19, $20, $21, $22, $23, $24, $25
+        )
+        ON CONFLICT (id)
+        DO UPDATE SET
+            skills = $1, 
+            languages = $2, 
+            mmc_number = $3, 
+            apc_number = $4, 
+            specialization = $5, 
+            experience_years = $6,
+            bio = $7, 
+            name = $8, 
+            ic = $9, 
+            address = $10, 
+            city = $11, 
+            state = $12, 
+            postal = $13, 
+            phone = $14,
+            email = $15, 
+            gender = $16, 
+            birthday = $17, 
+            minimum_pay = $18, 
+            preferred_days = $19, 
+            earliest_start = $20,
+            latest_end = $21, 
+            max_distance = $22, 
+            email_notif = $23, 
+            sms_notif = $24
+    `, values); 
+
+
+        return res.status(200).json({ error: false, message: "Doctor profile updated successfully" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+
+app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => {
+    const { 
+        jobTitle: title,
+        date,
+        chosenLanguages: languages,
+        chosenProcedure: procedure,
+        preferredDoctors: preferred_doctors,
+        address,
+        email,
+        phone,
+        paidBreak: paid_break,
+        totalPay: total_pay,
+        dayRate: day_rate,
+        nightRate: night_rate,
+        dayStart: start_day_time,
+        dayEnd: end_day_time,
+        nightStart: start_night_time,
+        nightEnd: end_night_time,
+        jobDescription: description,
+        jobIncentives: incentives,
+        preferredGender: gender,
+        contactPerson: contact,
+        specialInstructions: special_instructions,
+        shiftStart: start_time,
+        shiftEnd: end_time,
+        status
+    } = req.body;
+
+    try {
+        const clinicId = req.params.clinicId;
+        if (!clinicId) {
+            return res.status(400).json({error: true, message: "Clinic not found"});
+        }
+
+        // Proper array formatting for PostgreSQL
+        const formattedLanguages = Array.isArray(languages) ? languages : [languages];
+
+        const queryText = `
+            INSERT INTO manual_jobs (
+                clinic_id, title, procedure, description,
+                incentives, day_rate, night_rate, total_pay, date, 
+                start_time, end_time, gender, languages, 
+                preferred_doctors, paid_break, start_day_time, 
+                end_day_time, start_night_time, end_night_time, 
+                contact, special_instructions, email, address, phone, status
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+                $11, $12, $13, $14, $15, $16, $17, $18,
+                $19, $20, $21, $22, $23, $24, $25
+            ) RETURNING *
+        `;
+
+        const queryValues = [
+            clinicId, 
+            title, 
+            procedure, 
+            description, 
+            incentives, 
+            day_rate, 
+            night_rate,
+            total_pay, 
+            date, 
+            start_time, 
+            end_time, 
+            gender,  
+            formattedLanguages, 
+            preferred_doctors,
+            paid_break, 
+            start_day_time, 
+            end_day_time, 
+            start_night_time, 
+            end_night_time, 
+            contact, 
+            special_instructions,
+            email, 
+            address, 
+            phone,
+            status
+        ];
+
+        console.log('Executing query:', queryText);
+        console.log('With values:', queryValues);
+
+        const result = await pool.query(queryText, queryValues);
+
+        return res.status(200).json({
+            error: false, 
+            message: "Job successfully posted", 
+            job: result.rows[0]
+        });
+    } catch (error) {
+        console.error("Database error:", error);
+        return res.status(500).json({
+            error: true, 
+            message: "Internal server error",
+            details: error.message
+        });
+    }
+});
+
+// get all jobs posted by this clinic 
+app.get("/api/get-jobs/:clinicId/jobs", authenticateToken, async (req, res) => {
+    try {
+        const clinicId = req.params.clinicId;
+        if (!clinicId) {
+            return res.status(400).json({error: true, message: "Clinic not found"});
+        }
+        const result = await pool.query("SELECT * FROM manual_jobs WHERE clinic_id = $1", [clinicId]);
+        if (result.rows.length === 0) {
+            return res.status(400).json({error: true, message: "Not found"})
+        }
+        return res.status(200).json({error: false, message: "Jobs successfully retrieved", jobs: result.rows})
+    } catch (error) {
+        console.error(error)
+        return res.status(400).json({error: true, message: "Internal Server Error"})
+    }
+})
 
 // get clinic info 
 app.get("/api/get-clinic/:id", authenticateToken, async (req, res) => {
@@ -290,7 +567,7 @@ app.get("/api/get-clinic/:id", authenticateToken, async (req, res) => {
         return res.status(200).json({ error: false, clinic: clinicResult.rows[0] });
     } catch (error) {
         console.error(error);
-        return res.status(200).json({error: true, message: "Internal Server Error"})
+        return res.status(500).json({error: true, message: "Internal Server Error"})
     }
 });
 
@@ -343,6 +620,24 @@ app.get("/api/get-preferences/:id", authenticateToken, async(req, res)=> {
         }
         return res.status(200).json({ error: false, clinic: result.rows[0] });
     } catch(error) {
+        console.error(error);
+        return res.status(500).json({error: true, message: "Internal Server Error"});
+    }
+})
+
+// get doctor info 
+app.get("/api/get-doctor/:doctorId", authenticateToken, async(req, res) =>{
+    try {
+        const doctorId = req.params.doctorId;
+        if (!doctorId) {
+            return res.status(400).json({error: true, message: "Doctor not found"});
+        }
+        const result = await pool.query("SELECT * FROM doctors WHERE id = $1", [doctorId]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({error: true, message: "Doctor not found"});
+        } 
+        return res.status(200).json({error: false, message: "Doctor retrieved successfully", doctor: result.rows[0]})
+    } catch (error) {
         console.error(error);
         return res.status(500).json({error: true, message: "Internal Server Error"});
     }

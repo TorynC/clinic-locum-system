@@ -1,6 +1,6 @@
 import type React from "react"
 import Link from "next/link"
-import { Calendar, ClipboardList, Home, Settings, User, Users, PlusCircle, LogOut } from "lucide-react"
+import { Calendar, ClipboardList, Home, Settings, User, Users, PlusCircle, LogOut, Pencil } from "lucide-react"
 
 export default function Sidebar() {
   return (
@@ -12,6 +12,7 @@ export default function Sidebar() {
       <nav className="flex-1 px-4 space-y-1 py-4">
         <SidebarLink href="/clinic" icon={<Home className="h-5 w-5" />} label="Home" />
         <SidebarLink href="/clinic/post-job" icon={<PlusCircle className="h-5 w-5" />} label="Post a Job" />
+        <SidebarLink href="/clinic/edit-job" icon={<Pencil className="h-5 w-5" />} label="Edit a Job" />
         <SidebarLink href="/clinic/calendar" icon={<Calendar className="h-5 w-5" />} label="Calendar" />
         <SidebarLink href="/clinic/dashboard" icon={<ClipboardList className="h-5 w-5" />} label="Dashboard" />
         <SidebarLink href="/clinic/profile" icon={<User className="h-5 w-5" />} label="Clinic Profile" />

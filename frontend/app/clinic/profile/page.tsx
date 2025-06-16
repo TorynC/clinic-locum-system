@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect } from "react"
 import axiosInstance from "@/utils/axiosinstance"
+import { Clock } from "lucide-react"
 
 export default function ProfilePage() {
 
@@ -22,10 +23,15 @@ export default function ProfilePage() {
   const [clinicPostal, setClinicPostal] = useState("");
   const [clinicPhone, setClinicPhone] = useState("");
   const [clinicWebsite, setClinicWebsite] = useState("");
-  const [rate, setRate] = useState(0);
   const [qualifications, setQualifications] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
-  const [preferredDoctors, setPreferredDoctors] = useState(false);
+  const [preferredDoctors, setPreferredDoctors] = useState<boolean>(false);
+  const [dayRate, setDayRate] = useState<number>(45); 
+  const [nightRate, setNightRate] = useState<number>(35); 
+  const [dayStart, setDayStart] = useState<string>("09:00");
+  const [dayEnd, setDayEnd] = useState<string>("17:00");
+  const [nightStart, setNightStart] = useState<string>("20:00");
+  const [nightEnd, setNightEnd] = useState<string>("08:00");
   
   // function to save changes 
   const handleSaveGeneral = async () => {
@@ -43,19 +49,28 @@ export default function ProfilePage() {
 
   // function to save preferences
   const handleSavePreferences = async () => {
-    try {
-      await axiosInstance.patch(`/preferences/${clinicId}`, {
-        rate: rate,
-        qualifications: qualifications, 
-        languages: languages, 
-        preferredDoctorsOnly: preferredDoctors
-      })
-      console.log("success")
-    } catch (error) {
-      console.error(error)
-    }
+  try {
+    const response = await axiosInstance.patch(`/preferences/${clinicId}`, {
+      dayRate,
+      nightRate,
+      dayStart,
+      dayEnd,
+      nightStart,
+      nightEnd,
+      qualifications,
+      languages,
+      preferredDoctors // Make sure this matches your backend expectation
+    });
+    
+    // Update local state with the response data if needed
+    console.log("Preferences saved successfully:", response.data);
+    
+    // Optional: Show success message to user
+  } catch (error) {
+    console.error("Error saving preferences:", error);
+    // Optional: Show error message to user
   }
-
+}
   // function to save name
   const handleSaveName = async () => {
     try {
@@ -100,10 +115,15 @@ export default function ProfilePage() {
     try {
       const response = await axiosInstance.get(`/get-preferences/${clinicId}`);
       if (!response.data.error) {
-        setRate(response.data.clinic.rate);
+        setDayRate(response.data.clinic.day_rate);
+        setNightRate(response.data.clinic.night_rate);
         setQualifications(response.data.clinic.qualifications || []);
         setLanguages(response.data.clinic.languages || []);
         setPreferredDoctors(response.data.clinic.preferred_doctors_only);
+        setDayStart(response.data.clinic.day_start_time);
+        setDayEnd(response.data.clinic.day_end_time);
+        setNightStart(response.data.clinic.night_start_time);
+        setNightEnd(response.data.clinic.night_end_time);
       }
     } catch (error) {
       console.error(error);
@@ -309,9 +329,49 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="default-rate">Default Hourly Rate (MYR)</Label>
-                <Input id="default-rate" type="number" value={rate ? `${rate}` : ""}
-                onChange={(e) => setRate(Number(e.target.value))}/>
+                <Label htmlFor="default-rate">Default Day Time Rate (MYR)</Label>
+                <Input id="default-rate" type="number" value={Number(dayRate)}
+                onChange={(e) => setDayRate(Number(e.target.value))}/>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Day Start Time</Label>
+                <div className="relative">
+                  <Input id="start-time" type="time" value={dayStart} onChange={(e) => {setDayStart(e.target.value)}} />
+                  <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-time">Day End Time</Label>
+                <div className="relative">
+                  <Input id="end-time" type="time" value={dayEnd} onChange={(e) => {setDayEnd(e.target.value)}}/>
+                  <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="default-rate">Default Night Time Rate (MYR)</Label>
+                <Input id="default-rate" type="number" value={Number(nightRate)}
+                onChange={(e) => setNightRate(Number(e.target.value))}/>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="start-time">Night Start Time</Label>
+                <div className="relative">
+                  <Input id="start-time" type="time" value={nightStart} onChange={(e) => {setNightStart(e.target.value)}} />
+                  <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="end-time">Night End Time</Label>
+                <div className="relative">
+                  <Input id="end-time" type="time" value={nightEnd} onChange={(e) => {setNightEnd(e.target.value)}} />
+                  <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                </div>
+              </div>
               </div>
 
               <div className="space-y-2">

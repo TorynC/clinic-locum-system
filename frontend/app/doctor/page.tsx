@@ -1,16 +1,48 @@
+"use client"
 import type React from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 import { Briefcase, MapPin, Calendar, Clock, DollarSign, Star, Bell } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react"
+import axiosInstance from "@/utils/axiosinstance"
+import { join } from "path"
 
 export default function DoctorHomePage() {
+  const [name, setName] = useState("");
+  const [doctorId, setDoctorId] = useState("");
+
+  // get name
+  const getName = async(id: String) => {
+    try {
+      const response = await axiosInstance.get(`/get-doctor/${doctorId}`)
+      if (!response.data.error) {
+        setName(response.data.doctor.name)
+      }
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("doctorId")
+    if (storedId) {
+      setDoctorId(storedId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (doctorId) {
+      getName(doctorId);
+    };
+  }, [doctorId])
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">Welcome, Dr. Robert</h1>
+          <h1 className="text-3xl font-bold text-purple-900">{`Welcome, Dr. ${name}`}</h1>
           <p className="text-gray-500">Find and manage your locum opportunities</p>
         </div>
         <Button asChild className="bg-purple-gradient hover:bg-purple-700">
@@ -53,7 +85,7 @@ export default function DoctorHomePage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
+              {[  
                 {
                   clinic: "City Medical Clinic",
                   location: "Kuala Lumpur",

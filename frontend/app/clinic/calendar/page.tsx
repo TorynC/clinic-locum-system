@@ -1,35 +1,204 @@
-"use client"
-
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ChevronLeft, ChevronRight, Plus, Filter, CalendarIcon } from "lucide-react"
-import Link from "next/link"
-import { cn } from "@/lib/utils"
+"use client";
+import React from "react";
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Filter,
+  CalendarIcon,
+} from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
+import { getWeek, isToday } from "date-fns";
+import next from "next";
+import axiosInstance from "@/utils/axiosinstance";
+import { parseISO, setHours, setMinutes, setSeconds } from 'date-fns';
 
 export default function CalendarPage() {
-  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month")
-  const [currentMonth, setCurrentMonth] = useState("May 2025")
+  const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
 
-  // Mock data for calendar
-  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Generate calendar days (simplified for example)
-  const calendarDays = Array.from({ length: 35 }, (_, i) => {
-    const day = i - 3 // Offset to start month on correct day
-    return {
-      date: day > 0 && day <= 31 ? day : null,
-      isToday: day === 13,
-      jobs: getJobsForDay(day),
+  const calendarDays = getCalendarDays(currentDate);
+  
+  // get jobs 
+  const getJobs = async () => {
+    try {
+      const response = await axiosInstance.get(`/get-jobs/${clinicId}/jobs`);
+      if (!response.data.error) {
+        setJobs(response.data.jobs);
+      }
+    } catch (error) {
+      console.error(error)
     }
-  })
-
-  const nextMonth = () => {
-    setCurrentMonth("June 2025")
   }
 
+  // Get real calendar days
+  function getCalendarDays(date: Date) {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    return Array.from({ length: daysInMonth }, (_, i) => {
+      const current = new Date(year, month, i + 1);
+      return {
+        date: current,
+        isToday: isSameDay(current, new Date()),
+      };
+    });
+  }
+
+  function getWeekDays(date: Date) {
+    const startOfWeek = new Date(date);
+    startOfWeek.setDate(date.getDate() - date.getDay()); // Sunday
+
+    return Array.from({ length: 7 }, (_, i) => {
+      const day = new Date(startOfWeek);
+      day.setDate(startOfWeek.getDate() + i);
+      return {
+        date: day,
+        isToday: isSameDay(day, new Date()),
+      };
+    });
+  }
+  console.log(events)
+  function isSameDay(a: Date, b: Date) {
+    return (
+      a.getFullYear() === b.getFullYear() &&
+      a.getMonth() === b.getMonth() &&
+      a.getDate() === b.getDate()
+    );
+  }
+
+  const currentMonth = currentDate.toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
   const prevMonth = () => {
-    setCurrentMonth("April 2025")
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() - 1)
+    );
+  };
+
+  const nextMonth = () => {
+    setCurrentDate(
+      new Date(currentDate.getFullYear(), currentDate.getMonth() + 1)
+    );
+  };
+
+  const nextWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + 7)
+    setCurrentDate(newDate); 
+  };
+
+  const prevWeek = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() - 7)
+    setCurrentDate(newDate);
+  }
+
+  const tomorrow = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() + 1);
+    setCurrentDate(newDate);
+  }
+
+  const yesterday = () => {
+    const newDate = new Date(currentDate);
+    newDate.setDate(currentDate.getDate() - 1);
+    setCurrentDate(newDate);
+  }
+
+  const today = currentDate
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("clinicId");
+    if (storedId) {
+      setClinicId(storedId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (clinicId) {
+      getJobs();
+    }
+  }, [clinicId])
+
+  useEffect(() => {
+      if (jobs.length > 0) {
+      const formattedEvents = jobs.map((job) => {
+      const utcDate = new Date(job.date);
+      const malaysiaDate = new Date(utcDate.getTime() + 28800000);
+      
+      // Parse time components
+      const [startH, startM, startS] = job.start_time.split(':').map(Number);
+      const [endH, endM, endS] = job.end_time.split(':').map(Number);
+
+      // Set times on Malaysia date
+      const start = new Date(malaysiaDate)
+      start.setHours(startH, startM, startS);
+
+      const end = new Date(malaysiaDate);
+      end.setHours(endH, endM, endS);
+
+      if (end <= start) {
+        end.setDate(end.getDate() + 1)
+      }
+      
+      return {
+        title: job.title,
+        start,
+        end,
+        status: job.status,
+        id: job.id,
+        start_time: job.start_time,
+        end_time: job.end_time
+      };
+    });
+    setEvents(formattedEvents);
+  }
+}, [jobs]);
+
+
+  const getEventsforDayMonth = (day: Date) => {
+    return events.filter(event =>
+      event.start.getDate() === day.getDate() &&
+      event.start.getMonth() === day.getMonth() &&
+      event.start.getFullYear() === day.getFullYear()
+    )
+  }
+
+  const getEventsforDayWeek = (day: Date) => {
+    const startOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0);
+    const endOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59);
+
+    return events.filter(event =>
+      event.end > startOfDay && event.start < endOfDay
+    );
+  };
+
+  function getJobColor(status: string) {
+    switch (status) {
+      case "posted":
+        return "bg-purple-100 border border-purple-400 text-purple-800";
+      case "accepted":
+        return "bg-green-100 border border-green-400 text-green-800";
+      case "completed":
+        return "bg-indigo-100 border border-indigo-400 text-indigo-800";
+      default:
+        return "bg-gray-100 border border-gray-400 text-gray-800";
+    }
   }
 
   return (
@@ -37,11 +206,19 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-purple-900">Calendar</h1>
         <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" className="border-purple-200 text-purple-700">
+          {/*<Button
+            variant="outline"
+            size="sm"
+            className="border-purple-200 text-purple-700"
+          >
             <Filter className="h-4 w-4 mr-2" />
             Filter
-          </Button>
-          <Button size="sm" asChild className="bg-purple-gradient hover:bg-purple-700">
+          </Button>*/}
+          <Button
+            size="sm"
+            asChild
+            className="bg-purple-gradient hover:bg-purple-700"
+          >
             <Link href="/clinic/post-job">
               <Plus className="h-4 w-4 mr-2" />
               Post Job
@@ -55,19 +232,35 @@ export default function CalendarPage() {
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="icon" className="border-purple-200 text-purple-700" onClick={prevMonth}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="border-purple-200 text-purple-700"
+                onClick={viewMode === "month" ? prevMonth : viewMode === "week" ? prevWeek : yesterday}
+              >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <h2 className="text-xl font-bold text-purple-900">{currentMonth}</h2>
-              <Button variant="outline" size="icon" className="border-purple-200 text-purple-700" onClick={nextMonth}>
+              <h2 className="text-xl font-bold text-purple-900">
+                {currentMonth}
+              </h2>
+              <Button
+                variant="outline"
+                size="icon"
+                className="border-purple-200 text-purple-700"
+                onClick={viewMode === "month" ? nextMonth : viewMode === "week" ? nextWeek : tomorrow}
+              >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" className="gap-2 border-purple-200 text-purple-700">
+              {/*<Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-purple-200 text-purple-700"
+              >
                 <CalendarIcon className="h-4 w-4" />
                 Today
-              </Button>
+              </Button>*/}
               <select
                 className="h-9 rounded-md border border-purple-200 bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
                 value={viewMode}
@@ -80,41 +273,135 @@ export default function CalendarPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-1">
-            {days.map((day) => (
-              <div key={day} className="text-center font-medium py-2 text-purple-900">
-                {day}
-              </div>
-            ))}
-
-            {calendarDays.map((day, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "calendar-day border rounded-md p-1",
-                  !day.date ? "bg-gray-50 text-gray-400" : "hover:bg-purple-50 cursor-pointer",
-                  day.isToday && "ring-2 ring-purple-400",
-                )}
-              >
-                {day.date && (
-                  <>
-                    <div className={cn("text-right p-1 font-medium", day.isToday && "text-purple-600")}>{day.date}</div>
-                    <div className="space-y-1">
-                      {day.jobs.map((job, j) => (
+          {viewMode === "month" ? (
+            <div className="grid grid-cols-7 gap-1">
+              {days.map((day) => (
+                <div
+                  key={day}
+                  className="text-center font-medium py-2 text-purple-900"
+                >
+                  {day}
+                </div>
+              ))}
+              {calendarDays.map((day, i) => (
+                <div
+                  key={i}
+                  className={cn(
+                    "calendar-day border rounded-md p-1",
+                    !day.date
+                      ? "bg-gray-50 text-gray-400"
+                      : "hover:bg-purple-50 cursor-pointer",
+                    day.isToday && "ring-2 ring-purple-400"
+                  )}
+                >
+                  {day.date && (
+                    <>
+                      <div>
                         <div
-                          key={j}
-                          className={cn("calendar-event", getJobColor(job.status))}
-                          title={`${job.title} (${job.time})`}
+                          className={cn(
+                            "text-right p-1 font-medium",
+                            day.isToday && "text-purple-600"
+                          )}
                         >
-                          {job.time} - {job.title}
+                          {day.date.getDate()}
                         </div>
-                      ))}
+                          {getEventsforDayMonth(day.date).map(event => (
+                            <div key={event.id}  className={cn(
+                              "text-xs truncate rounded p-0.5 flex-col z-0 ",
+                              getJobColor(event.status))}>
+                              {event.title} 
+                              <div className=" text-xs z-10">
+                                {`${event.start_time}-${event.end_time}`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : viewMode === "week" ? (
+            <>
+              <div className="grid grid-cols-[80px_repeat(7,_1fr)] border-t border-l text-sm">
+                <div className="border-r border-b p-2 bg-purple-50"></div>
+                {getWeekDays(currentDate).map((day, i) => (
+                  <div
+                    key={i}
+                    className={ cn("border-r border-b p-2 text-center bg-purple-50 font-semibold", day.isToday && "bg-purple-300")}
+                  >
+                    {days[day.date.getDay()]} {day.date.getDate()}
+                  </div>
+                ))}
+
+                {[...Array(24)].map((_, hour) => (
+                  <React.Fragment key={hour}>
+                    <div className="border-r border-b p-1 text-right pr-2 bg-purple-50 text-gray-500 flex flex-col ">
+                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
                     </div>
-                  </>
-                )}
+                      {getWeekDays(currentDate).map((day, i) => (
+                    <div
+                      key={i}
+                      className="border-r border-b h-25 hover:bg-purple-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex "
+                    >
+                      {getEventsforDayWeek(day.date)
+                          .filter(event => 
+                            (event.start <= new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), hour, 59, 59)) &&
+                            (event.end > new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), hour, 0, 0)))
+                            .map(event => (
+                            <div key={event.id}  className={cn(
+                              "text-xs truncate rounded p-0.5 flex-col z-0 ",
+                              getJobColor(event.status))}>
+                              {event.title} 
+                              <div className=" text-xs z-10">
+                                {`${event.start_time}-${event.end_time}`}
+                              </div>
+                            </div>
+                        ))}
+                      
+                    </div>
+                  ))}
+                  </React.Fragment>
+                ))}
+                
               </div>
-            ))}
-          </div>
+            </>
+          ) : viewMode === "day" ? (
+            <>
+              <div className="grid grid-cols-[80px_1fr] border-t border-l text-sm">
+                <div className="border-r border-b p-2 bg-purple-50"></div>
+                {today && (
+                  <div className={cn("border-b p-2 text-center bg-purple-50 font-semibold", isSameDay(today, new Date()) && "bg-purple-300")}>
+                    {days[today.getDay()]} {today.getDate()} 
+                  </div>
+                )}
+
+                {[...Array(24)].map((_, hour) => (
+                  <React.Fragment key={hour}>
+                    <div className="border-r border-b p-1 text-right pr-2 bg-purple-50 text-gray-500">
+                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
+                    </div>
+                    <div className="border-r border-b h-25 hover:bg-purple-50 relative">
+                      {getEventsforDayWeek(today)
+                          .filter(event => 
+                            (event.start <= new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 59, 59)) &&
+                            (event.end > new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0)))
+                            .map(event => (
+                            <div key={event.id}  className={cn(
+                              "text-xs truncate rounded p-0.5 flex-col z-0 ",
+                              getJobColor(event.status))}>
+                              {event.title} 
+                              <div className=" text-xs z-10">
+                                {`${event.start_time}-${event.end_time}`}
+                              </div>
+                            </div>
+                        ))}
+                    </div>
+                  </React.Fragment>
+                ))}
+              </div>
+            </>
+          ) : null}
         </CardContent>
       </Card>
 
@@ -136,42 +423,7 @@ export default function CalendarPage() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-// Helper functions for mock data
-function getJobsForDay(day: number) {
-  if (!day || day > 31) return []
 
-  // Generate some sample jobs for specific days
-  if (day === 13) {
-    return [
-      { title: "General Practice", time: "9AM-5PM", status: "posted" },
-      { title: "Pediatrics", time: "2PM-6PM", status: "posted" },
-    ]
-  } else if (day === 15) {
-    return [{ title: "Dental", time: "8AM-4PM", status: "accepted" }]
-  } else if (day === 10) {
-    return [{ title: "Emergency", time: "7PM-7AM", status: "completed" }]
-  } else if (day === 20) {
-    return [{ title: "General Practice", time: "9AM-1PM", status: "posted" }]
-  } else if (day % 7 === 0) {
-    // Some random days
-    return [{ title: "Specialist", time: "10AM-2PM", status: "accepted" }]
-  }
-
-  return []
-}
-
-function getJobColor(status: string) {
-  switch (status) {
-    case "posted":
-      return "bg-purple-100 border border-purple-400 text-purple-800"
-    case "accepted":
-      return "bg-green-100 border border-green-400 text-green-800"
-    case "completed":
-      return "bg-indigo-100 border border-indigo-400 text-indigo-800"
-    default:
-      return "bg-gray-100 border border-gray-400 text-gray-800"
-  }
-}

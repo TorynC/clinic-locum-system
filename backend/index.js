@@ -17,13 +17,13 @@ app.use(express.json());
 app.use(cookieParser())
 app.use(
     cors({
-        origin:allowedOrigins,
+        origin:'http://24.199.118.55:8080',
         credentials: true,
     })
 );
 
 //test API route to check if the server is running
-app.get('/test', (req, res) => {
+app.get('/api/test', (req, res) => {
   res.send('Server is working!');
 });
 
@@ -644,6 +644,6 @@ app.get("/api/get-doctor/:doctorId", authenticateToken, async(req, res) =>{
 })
 
 // Start server 
-app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+	console.log(`Server is running on http://0.0.0.0:${PORT}`);
 });

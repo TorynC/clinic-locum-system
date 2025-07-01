@@ -17,6 +17,7 @@ import { useEffect } from "react"
 import { formatISO } from "date-fns"
 import { useRouter } from "next/navigation";
 import axios from "axios"
+import { start } from "repl"
 
 export default function PostJobPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
@@ -37,7 +38,7 @@ export default function PostJobPage() {
   const [nightEnd, setNightEnd] = useState<string>("08:00");
   const [jobTitle, setJobTitle] = useState("");
   const [chosenLanguages, setChosenLanguages] = useState<string[]>([]);
-  const [chosenProcedure, setChosenProcedure] = useState("");
+  //const [chosenProcedure, setChosenProcedure] = useState<string[]>([]);
   const [jobDescription, setJobDescription] = useState("");
   const [jobIncentives, setJobIncentives] = useState("");
   const [preferredGender, setPreferredGender] = useState("");
@@ -45,15 +46,10 @@ export default function PostJobPage() {
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [shiftStart, setShiftStart] = useState<string>("09:00");
   const [shiftEnd, setShiftEnd] = useState<string>("20:00");
+  const [twoRates, setTwoRates] = useState<boolean>(false);
+  const [rate, setRate] = useState<number>(0);
+  const [duration, setDuration] = useState<number>(0);
   const router = useRouter();
-
-  const qualificationOptions: Record<string, string> = {
-  'General Practice': 'General Consultation',
-  'Pediatrics': 'Pediatric Care',
-  'Dental': 'Dental Procedure',
-  'Emergency': 'Emergency Care',
-  'Surgery': 'Minor Surgery',
-};  
   
   // function to calculate total pay 
   function calculateTotalPay(): number {
@@ -61,48 +57,62 @@ export default function PostJobPage() {
       const [hours, minutes] = timeStr.split(":").map(Number);
       return hours + minutes / 60;
     };
+    if (twoRates) {
+      const dayStartHours = parseTime(dayStart);
+      const dayEndHours = parseTime(dayEnd);
+      const nightStartHours = parseTime(nightStart);
+      const nightEndHours = parseTime(nightEnd);
+      const dayHours = dayEndHours - dayStartHours;
+      let nightHours = 0;
+      if (nightEndHours > nightStartHours) {
+        nightHours = nightEndHours - nightStartHours;
+      } else {
+        nightHours = (24 - nightStartHours) + nightEndHours;
+      }
 
-    const dayStartHours = parseTime(dayStart);
-    const dayEndHours = parseTime(dayEnd);
-    const nightStartHours = parseTime(nightStart);
-    const nightEndHours = parseTime(nightEnd);
+      let result = (dayRate * dayHours) + (nightRate * nightHours);
+      setDuration(dayHours + nightHours);
+      if (!paidBreak) {
+        
+        const breakHours = 1;
+        const dayBreakFraction = dayHours / (dayHours + nightHours);
+        const nightBreakFraction = nightHours / (dayHours + nightHours);
+        
+        result -= dayRate * (breakHours * dayBreakFraction);
+        result -= nightRate * (breakHours * nightBreakFraction);
+      }
 
-    // Calculate day shift hours
-    const dayHours = dayEndHours - dayStartHours;
+      return result;
 
-    // Calculate night shift hours (handles overnight case)
-    let nightHours = 0;
-    if (nightEndHours > nightStartHours) {
-      nightHours = nightEndHours - nightStartHours;
     } else {
-      nightHours = (24 - nightStartHours) + nightEndHours;
+      const startHours = parseTime(shiftStart);
+      const endHours = parseTime(shiftEnd);
+      let Hours;
+      if (endHours > startHours) {
+        Hours = endHours - startHours;
+      } else {
+        Hours = (24 - startHours) + endHours;
+        
+      }
+      if (!paidBreak) {
+          Hours = Hours - 1 
+      }
+      const result = (Hours * rate);
+      setDuration(Hours);
+      return result;
     }
-
-    let result = (dayRate * dayHours) + (nightRate * nightHours);
-
-    if (!paidBreak) {
-      // Subtract 1 hour total for unpaid break (adjust as needed)
-      const breakHours = 1;
-      const dayBreakFraction = dayHours / (dayHours + nightHours);
-      const nightBreakFraction = nightHours / (dayHours + nightHours);
-      
-      result -= dayRate * (breakHours * dayBreakFraction);
-      result -= nightRate * (breakHours * nightBreakFraction);
-    }
-
-    return result;
   }
 
-  // call this whenever relevant input changes
+  
   const updateTotalPay = () => {
     const calculatedPay = calculateTotalPay();
     setTotalPay(calculatedPay);
   };
 
-  // Add useEffect to auto-update when inputs change
+  
   useEffect(() => {
     updateTotalPay();
-  }, [dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, paidBreak]);
+  }, [dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, paidBreak, shiftStart, shiftEnd, rate]);
 
   // function to get email 
   const getEmail = async () => {
@@ -124,7 +134,7 @@ export default function PostJobPage() {
       jobTitle,
       date: formattedDate,
       chosenLanguages,
-      chosenProcedure,
+      chosenProcedure: qualifications,
       preferredDoctors,
       address,
       email,
@@ -144,7 +154,10 @@ export default function PostJobPage() {
       specialInstructions,
       shiftStart,
       shiftEnd,
-      status: "posted"
+      status: "posted",
+      rate,
+      twoRates,
+      duration
     }
     console.log("Payload being sent:", payLoad);
     
@@ -189,6 +202,11 @@ export default function PostJobPage() {
         setQualifications(response.data.clinic.qualifications || []);
         setLanguages(response.data.clinic.languages || []);
         setPreferredDoctors(response.data.clinic.preferred_doctors_only);
+        setChosenLanguages(response.data.clinic.languages);
+        setTwoRates(response.data.clinic.two_rates);
+        setShiftStart(response.data.clinic.start_time);
+        setShiftEnd(response.data.clinic.end_time);
+        setRate(response.data.clinic.default_rate);
       }
     } catch (error) {
       console.error(error);
@@ -236,17 +254,23 @@ export default function PostJobPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="procedure-type">Type of Procedure</Label>
-              <select
-                id="procedure-type"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={chosenProcedure} onChange={(e) => {setChosenProcedure(e.target.value)}}
-              >
-                <option value="" >Select procedure type</option>
-                {qualifications.map((q) => (qualificationOptions[q] && (<option key={q} value={q}>
-                  {qualificationOptions[q]}
-                </option>)))}
-              </select>
+              <Label>Required Skills and Procedures</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {["Antenatal Care",'ECG','Wound Care', 'IM Injection','Suturing', 'Venipuncture','Basic Surgery', "Paeds Care"].map((procedure) => (
+                  <div key={procedure} className="flex items-center space-x-2">
+                    <input type="checkbox" id={`prod-${procedure}`} className="h-4 w-4 rounded border-gray-300" 
+                    checked={qualifications.includes(procedure)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setQualifications([...qualifications, procedure]);
+                      } else {
+                        setQualifications(qualifications.filter((q) => q !== procedure));
+                      }
+                    }}/>
+                    <Label htmlFor={`prod-${procedure}`}>{procedure}</Label>
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -271,15 +295,20 @@ export default function PostJobPage() {
               />
             </div>
 
-            <div className="space-y-2">
+            {!twoRates && <div className="space-y-2">
+              <Label htmlFor="day-hourly-rate">Hourly Rate (MYR)</Label>
+              <Input id="hourly-rate" type="number" value={Number(rate)} onChange={(e) => {setRate(Number(e.target.value))}} />
+            </div>}
+
+            {twoRates && <div className="space-y-2">
               <Label htmlFor="day-hourly-rate">Day Time Hourly Rate (MYR)</Label>
               <Input id="hourly-rate" type="number" value={Number(dayRate)} onChange={(e) => {setDayRate(Number(e.target.value))}} />
-            </div>
+            </div>}
 
-            <div className="space-y-2">
+            {twoRates && <div className="space-y-2">
               <Label htmlFor="night-hourly-rate">Night Time Hourly Rate (MYR)</Label>
               <Input id="hourly-rate" type="number" value={Number(nightRate)} onChange={(e) => {setNightRate(Number(e.target.value))}} />
-            </div>
+            </div>}
 
             <div className="space-y-2">
             <Label htmlFor="total-pay">Total Pay Before Incentives (MYR)</Label>
@@ -318,7 +347,7 @@ export default function PostJobPage() {
               </Popover>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {!twoRates && <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start-time">Start Time</Label>
                 <div className="relative">
@@ -333,7 +362,7 @@ export default function PostJobPage() {
                   <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
-            </div>
+            </div>}
 
             <div className="space-y-2">
               <Label>Preferred Gender</Label>
@@ -359,7 +388,7 @@ export default function PostJobPage() {
             <div className="space-y-2">
               <Label>Required Languages</Label>
               <div className="grid grid-cols-2 gap-2">
-                {languages.map((language) => (
+                {["English", "Malay", "Mandarin", "Tamil", "Cantonese"].map((language) => (
                   <div key={language} className="flex items-center space-x-2">
                     <input type="checkbox" id={`lang-${language}`} className="h-4 w-4 rounded border-gray-300" 
                     checked={chosenLanguages.includes(language)}
@@ -387,7 +416,7 @@ export default function PostJobPage() {
             </div>
               
 
-            <div className="grid grid-cols-2 gap-4">
+            {twoRates && <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start-time">Start Day Time</Label>
                 <div className="relative">
@@ -402,9 +431,9 @@ export default function PostJobPage() {
                   <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
-            </div>
+            </div>}
 
-            <div className="grid grid-cols-2 gap-4">
+            {twoRates && <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start-time">Start Night Time</Label>
                 <div className="relative">
@@ -419,7 +448,7 @@ export default function PostJobPage() {
                   <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
-            </div>
+            </div>}
           </CardContent>
         </Card>
       </div>

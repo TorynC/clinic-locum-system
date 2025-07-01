@@ -1,6 +1,6 @@
 import type React from "react"
 import Link from "next/link"
-import { Calendar, ClipboardList, Home, Settings, User, Users, PlusCircle, LogOut } from "lucide-react"
+import { Calendar, ClipboardList, Home, Settings, User, Users, PlusCircle, LogOut, Briefcase } from "lucide-react"
 
 export default function Sidebar() {
   return (

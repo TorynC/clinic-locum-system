@@ -1,6 +1,6 @@
 "use client"
 
-import { Home, Calendar, Briefcase, ClipboardList, User } from "lucide-react"
+import { Home, Calendar, Briefcase, BarChart3, User } from "lucide-react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -12,12 +12,12 @@ export default function DoctorBottomNavigation() {
     { name: "Home", href: "/doctor", icon: Home },
     { name: "Jobs", href: "/doctor/jobs", icon: Briefcase },
     { name: "Calendar", href: "/doctor/calendar", icon: Calendar },
-    { name: "Dashboard", href: "/doctor/dashboard", icon: ClipboardList },
+    { name: "Dashboard", href: "/doctor/dashboard", icon: BarChart3 },
     { name: "Profile", href: "/doctor/profile", icon: User },
   ]
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden safe-bottom">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
           const isActive = item.href === "/doctor" ? pathname === "/doctor" : pathname.startsWith(item.href)
@@ -27,9 +27,10 @@ export default function DoctorBottomNavigation() {
               key={item.name}
               href={item.href}
               className={cn("bottom-nav-item w-full h-full", isActive && "active")}
+              aria-label={item.name}
             >
               <item.icon className={cn("h-6 w-6 mb-1", isActive ? "text-purple-600" : "text-gray-500")} />
-              <span className={isActive ? "text-purple-600" : "text-gray-500"}>{item.name}</span>
+              <span className={cn("text-xs", isActive ? "text-purple-600" : "text-gray-500")}>{item.name}</span>
             </Link>
           )
         })}

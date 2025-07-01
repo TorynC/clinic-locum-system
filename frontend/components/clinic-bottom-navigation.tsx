@@ -17,7 +17,7 @@ export default function BottomNavigation() {
   ]
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden">
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 md:hidden safe-bottom">
       <div className="flex justify-around items-center h-16">
         {navItems.map((item) => {
           const isActive = item.href === "/clinic" ? pathname === "/clinic" : pathname.startsWith(item.href)
@@ -27,9 +27,10 @@ export default function BottomNavigation() {
               key={item.name}
               href={item.href}
               className={cn("bottom-nav-item w-full h-full", isActive && "active")}
+              aria-label={item.name}
             >
               <item.icon className={cn("h-6 w-6 mb-1", isActive ? "text-purple-600" : "text-gray-500")} />
-              <span className={isActive ? "text-purple-600" : "text-gray-500"}>{item.name}</span>
+              <span className={cn("text-xs", isActive ? "text-purple-600" : "text-gray-500")}>{item.name}</span>
             </Link>
           )
         })}

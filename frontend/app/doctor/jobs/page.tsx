@@ -1,334 +1,452 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Search, MapPin, Calendar, Clock, DollarSign, SlidersHorizontal } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Search, MapPin, Calendar, Clock, Filter, X, ChevronDown, DollarSign } from "lucide-react"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
+import axiosInstance from "@/utils/axiosinstance"
+import { time } from "console"
+
 
 export default function DoctorJobsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filterOpen, setFilterOpen] = useState(false)
+  const [selectedFilters, setSelectedFilters] = useState({
+    specialty: "",
+    distance: "",
+    date: "",
+    rate: "",
+  })
+  const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [clinicNames, setClinicNames] = useState<{ [key: string]: string }>({});
+  const [clinicCities, setClinicCities] = useState<{ [key: string]: string }>({});
+  
+  const malaysiaDate = new Date(new Date().toLocaleString("en-US", {
+    timeZone: "Asia/Kuala_Lumpur"
+  }));
 
-  // Mock data for jobs
-  const jobs = [
-    {
-      id: 1,
-      clinicName: "City Medical Clinic",
-      location: "Kuala Lumpur",
-      distance: "3.2 km",
-      date: "May 15, 2025",
-      timeSlot: "9:00 AM - 5:00 PM",
-      hours: 8,
-      hourlyRate: 85,
-      totalPay: 680,
-      specialty: "General Practice",
-      skills: ["IM Injection", "Venipuncture", "ECG"],
-      languages: ["English", "Malay"],
-      genderPreference: "Any",
-      isNew: true,
-    },
-    {
-      id: 2,
-      clinicName: "KidsCare Pediatric Center",
-      location: "Petaling Jaya",
-      distance: "5.8 km",
-      date: "May 16, 2025",
-      timeSlot: "10:00 AM - 6:00 PM",
-      hours: 8,
-      hourlyRate: 90,
-      totalPay: 720,
-      specialty: "Pediatrics",
-      skills: ["Vaccination", "Child Development"],
-      languages: ["English", "Mandarin"],
-      genderPreference: "Female",
-      isNew: true,
-    },
-    {
-      id: 3,
-      clinicName: "Dental Plus",
-      location: "Subang Jaya",
-      distance: "8.5 km",
-      date: "May 18, 2025",
-      timeSlot: "8:00 AM - 4:00 PM",
-      hours: 8,
-      hourlyRate: 95,
-      totalPay: 760,
-      specialty: "Dental",
-      skills: ["General Dentistry", "Cosmetic Dentistry"],
-      languages: ["English", "Malay"],
-      genderPreference: "Any",
-      isNew: false,
-    },
-    {
-      id: 4,
-      clinicName: "Emergency Care Center",
-      location: "Shah Alam",
-      distance: "12.3 km",
-      date: "May 20, 2025",
-      timeSlot: "7:00 PM - 7:00 AM",
-      hours: 12,
-      hourlyRate: 100,
-      totalPay: 1200,
-      specialty: "Emergency Medicine",
-      skills: ["Trauma Care", "Critical Care"],
-      languages: ["English"],
-      genderPreference: "Male",
-      isNew: false,
-    },
-    {
-      id: 5,
-      clinicName: "Family Health Clinic",
-      location: "Ampang",
-      distance: "6.7 km",
-      date: "May 22, 2025",
-      timeSlot: "9:00 AM - 1:00 PM",
-      hours: 4,
-      hourlyRate: 85,
-      totalPay: 340,
-      specialty: "General Practice",
-      skills: ["Family Medicine", "Geriatrics"],
-      languages: ["English", "Malay", "Tamil"],
-      genderPreference: "Any",
-      isNew: false,
-    },
-  ]
+  // function to get all available jobs 
+  const getAllJobs = async () => {
+    const token = localStorage.getItem("doctorAccessToken");
+    try {
+      const result = await axiosInstance.get(`/get-all-jobs`, 
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          }
+        })
+      if (!result.data.error) {
+        setJobs(result.data.jobs);
+        fetchClinicNames(result.data.jobs);
+        fetchClinicCities(result.data.jobs);
+        console.log("jobs retrieved successfully")
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  }
 
+
+  // After fetching jobs, fetch clinic names
+  const fetchClinicNames = async (jobs: any[]) => {
+    const token = localStorage.getItem("doctorAccessToken");
+    const uniqueClinicIds = Array.from(new Set(jobs.map(job => job.clinic_id)));
+    const namesMap: { [key: string]: string } = {};
+
+    await Promise.all(
+      uniqueClinicIds.map(async (id) => {
+        try {
+          const res = await axiosInstance.get(`/get-clinic/${id}`, {
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            }
+          });
+          if (!res.data.error) {
+            namesMap[id] = res.data.clinic.clinic_name;
+          }
+        } catch (e) {
+          namesMap[id] = "Unknown Clinic";
+        }
+      })
+    );
+    setClinicNames(namesMap);
+  };
+
+  // get all clinic cities 
+  const fetchClinicCities = async (jobs: any[]) => {
+    const token = localStorage.getItem("doctorAccessToken");
+    const uniqueClinicIds = Array.from(new Set(jobs.map(job => job.clinic_id)));
+    const citiesMap: { [key: string]: string } = {};
+
+     await Promise.all(
+      uniqueClinicIds.map(async (id) => {
+        try {
+          const res = await axiosInstance.get(`/get-contact-details/${id}`, {
+            headers: {
+              ...(token && { Authorization: `Bearer ${token}` }),
+            }
+          });
+          if (!res.data.error) {
+            citiesMap[id] = res.data.clinic.city;
+          }
+        } catch (e) {
+          citiesMap[id] = "Unknown Clinic";
+        }
+      })
+    );
+    setClinicCities(citiesMap);
+  };
+  
   const filteredJobs = jobs.filter((job) => {
-    if (!searchQuery) return true
-    return (
-      job.clinicName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.specialty.toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    const matchesSearch =
+      job.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (clinicCities[job.clinic_id] || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      clinicNames[job.clinic_id].toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (Array.isArray(job.procedure) 
+    ? job.procedure.some((proc: string) =>
+        proc.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : false)
+    const jobDate = job.date ? new Date(new Date(job.date).toLocaleString("en-US", {timeZone: "Asia/Kuala_Lumpur"})) : null;
+    const isPast = jobDate ? jobDate > malaysiaDate : false;
+    const matchesSpecialty = selectedFilters.specialty ? job.specialty === selectedFilters.specialty : true
+    const matchesDistance = selectedFilters.distance
+      ? Number.parseFloat(job.distance) <= Number.parseFloat(selectedFilters.distance)
+      : true
+    const matchesRate = selectedFilters.rate ? job.hourlyRate >= Number.parseInt(selectedFilters.rate) : true
+ 
+    return matchesSearch && matchesSpecialty && matchesDistance && matchesRate && isPast
   })
 
+  const clearFilters = () => {
+    setSelectedFilters({
+      specialty: "",
+      distance: "",
+      date: "",
+      rate: "",
+    })
+  }
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("doctorId");
+    if (storedId) {
+      setDoctorId(storedId)
+    }
+  }, []);
+
+  useEffect(() => {
+    if (doctorId) {
+      getAllJobs();
+    }
+  }, [doctorId])
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 pb-20 md:pb-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">Browse Jobs</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-purple-900">Browse Jobs</h1>
           <p className="text-gray-500">Find locum opportunities that match your skills</p>
+        </div>
+      </div>
+
+      {/* Search and Filter */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+          <Input
+            placeholder="Search by clinic, location, or specialty..."
+            className="pl-8"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
         <Button
           variant="outline"
-          className="gap-2 border-purple-200 text-purple-700"
+          className="border-purple-200 text-purple-700 flex items-center gap-2"
           onClick={() => setFilterOpen(!filterOpen)}
         >
-          <SlidersHorizontal className="h-4 w-4" />
+          <Filter className="h-4 w-4" />
           Filters
+          <ChevronDown className={`h-4 w-4 transition-transform ${filterOpen ? "rotate-180" : ""}`} />
         </Button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
-        <Input
-          placeholder="Search by clinic, location, or specialty..."
-          className="pl-10"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
-
+      {/* Filter Panel */}
       {filterOpen && (
         <Card className="border-purple-100">
           <CardContent className="p-4">
-            <div className="grid gap-4 md:grid-cols-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Location</label>
-                <select className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">Any Location</option>
-                  <option value="near">Near Me (25km)</option>
-                  <option value="kl">Kuala Lumpur</option>
-                  <option value="pj">Petaling Jaya</option>
-                  <option value="subang">Subang Jaya</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Date Range</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Input type="date" className="text-sm" placeholder="From" />
-                  <Input type="date" className="text-sm" placeholder="To" />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Specialty</label>
-                <select className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  <option value="">Any Specialty</option>
-                  <option value="general">General Practice</option>
-                  <option value="pediatric">Pediatrics</option>
-                  <option value="dental">Dental</option>
-                  <option value="emergency">Emergency</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Hourly Rate</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="relative">
-                    <Input type="number" className="pl-7 text-sm" placeholder="Min" />
-                    <span className="absolute left-2 top-2.5 text-gray-500">RM</span>
-                  </div>
-                  <div className="relative">
-                    <Input type="number" className="pl-7 text-sm" placeholder="Max" />
-                    <span className="absolute left-2 top-2.5 text-gray-500">RM</span>
-                  </div>
-                </div>
-              </div>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-purple-900">Filter Jobs</h3>
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 text-gray-500">
+                <X className="h-3.5 w-3.5 mr-1" />
+                Clear All
+              </Button>
             </div>
-
-            <div className="flex justify-end mt-4 space-x-2">
-              <Button variant="outline" size="sm" className="border-purple-200 text-purple-700">
-                Reset
-              </Button>
-              <Button size="sm" className="bg-purple-gradient hover:bg-purple-700">
-                Apply Filters
-              </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label htmlFor="specialty" className="block text-sm font-medium text-gray-700 mb-1">
+                  Specialty
+                </label>
+                <select
+                  id="specialty"
+                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                  value={selectedFilters.specialty}
+                  onChange={(e) => setSelectedFilters({ ...selectedFilters, specialty: e.target.value })}
+                >
+                  <option value="">All Specialties</option>
+                  <option value="General Practice">General Practice</option>
+                  <option value="Pediatrics">Pediatrics</option>
+                  <option value="Dental">Dental</option>
+                  <option value="Emergency Medicine">Emergency Medicine</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="distance" className="block text-sm font-medium text-gray-700 mb-1">
+                  Max Distance
+                </label>
+                <select
+                  id="distance"
+                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                  value={selectedFilters.distance}
+                  onChange={(e) => setSelectedFilters({ ...selectedFilters, distance: e.target.value })}
+                >
+                  <option value="">Any Distance</option>
+                  <option value="5">Within 5 km</option>
+                  <option value="10">Within 10 km</option>
+                  <option value="15">Within 15 km</option>
+                  <option value="25">Within 25 km</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="date" className="block text-sm font-medium text-gray-700 mb-1">
+                  Date Range
+                </label>
+                <select
+                  id="date"
+                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                  value={selectedFilters.date}
+                  onChange={(e) => setSelectedFilters({ ...selectedFilters, date: e.target.value })}
+                >
+                  <option value="">Any Date</option>
+                  <option value="week">Next 7 days</option>
+                  <option value="month">Next 30 days</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="rate" className="block text-sm font-medium text-gray-700 mb-1">
+                  Min Hourly Rate
+                </label>
+                <select
+                  id="rate"
+                  className="w-full rounded-md border border-gray-300 p-2 text-sm"
+                  value={selectedFilters.rate}
+                  onChange={(e) => setSelectedFilters({ ...selectedFilters, rate: e.target.value })}
+                >
+                  <option value="">Any Rate</option>
+                  <option value="80">RM 80+</option>
+                  <option value="90">RM 90+</option>
+                  <option value="100">RM 100+</option>
+                </select>
+              </div>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Tabs defaultValue="all">
-        <TabsList className="grid w-full grid-cols-3 max-w-md bg-purple-100 text-purple-600">
-          <TabsTrigger value="all">All Jobs</TabsTrigger>
-          <TabsTrigger value="new">New Jobs</TabsTrigger>
-          <TabsTrigger value="saved">Saved Jobs</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-6">
-          <div className="space-y-4">
-            {filteredJobs.map((job) => (
-              <JobCard key={job.id} job={job} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="new" className="mt-6">
-          <div className="space-y-4">
-            {filteredJobs
-              .filter((job) => job.isNew)
-              .map((job) => (
-                <JobCard key={job.id} job={job} />
-              ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="saved" className="mt-6">
-          <div className="text-center py-8 text-gray-500">
-            <p>You haven't saved any jobs yet.</p>
-          </div>
-        </TabsContent>
-      </Tabs>
-    </div>
-  )
-}
-
-function JobCard({ job }: { job: any }) {
-  return (
-    <Card className="border-purple-100 hover:border-purple-300 transition-colors">
-      <CardContent className="p-6">
-        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-purple-900">{job.clinicName}</h3>
-                {job.isNew && (
-                  <Badge className="bg-green-100 text-green-800 border-green-200 hover:bg-green-200">New</Badge>
-                )}
-              </div>
-              <div className="flex items-center text-gray-500 mt-1">
-                <MapPin className="h-4 w-4 mr-1" />
-                <span className="text-sm">
-                  {job.location} • {job.distance}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-6">
-              <div className="flex items-center text-gray-700">
-                <Calendar className="h-4 w-4 text-purple-600 mr-2" />
-                <span className="text-sm">{job.date}</span>
-              </div>
-              <div className="flex items-center text-gray-700">
-                <Clock className="h-4 w-4 text-purple-600 mr-2" />
-                <span className="text-sm">{job.timeSlot}</span>
-              </div>
-              <div className="flex items-center text-gray-700">
-                <DollarSign className="h-4 w-4 text-purple-600 mr-2" />
-                <span className="text-sm">
-                  RM {job.hourlyRate}/hr • RM {job.totalPay}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">SPECIALTY</p>
-                <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-                  {job.specialty}
-                </Badge>
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">REQUIRED SKILLS</p>
-                <div className="flex flex-wrap gap-1">
-                  {job.skills.map((skill: string) => (
-                    <Badge key={skill} variant="outline" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs font-medium text-gray-500 mb-1">LANGUAGES</p>
-                <div className="flex flex-wrap gap-1">
-                  {job.languages.map((language: string) => (
-                    <Badge key={language} variant="outline" className="text-xs">
-                      {language}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex flex-row md:flex-col justify-between md:justify-start items-end md:items-center gap-4">
-            <div className="text-center">
-              <p className="text-xs font-medium text-gray-500 mb-1">GENDER PREFERENCE</p>
-              <Badge
-                variant="outline"
-                className={cn(
-                  "text-xs",
-                  job.genderPreference === "Any"
-                    ? "bg-gray-50 text-gray-700 border-gray-200"
-                    : job.genderPreference === "Male"
-                      ? "bg-blue-50 text-blue-700 border-blue-200"
-                      : "bg-pink-50 text-pink-700 border-pink-200",
-                )}
-              >
-                {job.genderPreference}
-              </Badge>
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Button asChild className="bg-purple-gradient hover:bg-purple-700">
-                <Link href={`/doctor/jobs/${job.id}`}>View Details</Link>
-              </Button>
-              <Button variant="outline" className="border-purple-200 text-purple-700">
-                Save Job
-              </Button>
-            </div>
-          </div>
+      {/* Results Count */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-500">
+          Showing <span className="font-medium">{filteredJobs.length}</span> jobs
+        </p>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-500">Sort by:</span>
+          <select className="text-sm border-gray-300 rounded-md">
+            <option>Date (Newest)</option>
+            <option>Hourly Rate (Highest)</option>
+            <option>Distance (Closest)</option>
+          </select>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Job Listings */}
+      <div className="space-y-3">
+        {filteredJobs.length > 0 ? (
+          filteredJobs.map((job) => (
+            <Link href={`/doctor/jobs/${job.id}`} key={job.id} className="block group">
+              <Card className="border-0 shadow-medium hover:shadow-strong transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50/50">
+                <CardContent className="p-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-4 mb-3">
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0">
+                          {job.title.charAt(0)}
+                        </div>
+                        <div className="min-w-0 flex-1" >
+                          <h3 className="font-bold text-xl text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                            {job.title}
+                          </h3>
+                          <h3 className="text-l text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                            {clinicNames[job.clinic_id]}
+                          </h3>
+                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-slate-600 mt-1">
+                            <div className="flex items-center">
+                              <MapPin className="h-4 w-4 mr-1 text-slate-500" />
+                              {clinicCities[job.clinic_id]}
+                            </div>
+                            <div className="flex items-center">
+                              <Calendar className="h-4 w-4 mr-1 text-slate-500" />
+                              {new Date(job.date).toLocaleDateString("en-MY", {
+                                year: "numeric",
+                                month: "short",
+                                day: "numeric",
+                                timeZone: "Asia/Kuala_Lumpur"
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        <Badge
+                          className={cn(
+                            "text-sm font-medium border px-3 py-1",
+                            job.gender === "female" ? "bg-pink-100 text-pink-700 border-pink-200"
+                            : job.gender === "male" ? "bg-blue-100 text-blue-700 border-pink-200" 
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                            )}
+                        >
+                          {job.gender === "any" ? "Any Gender" : job.gender === "male" ? "Male Doctor" : "Female Doctor"}
+                        </Badge>
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                          {job.procedure.slice(0, 3).map((skill: string, i:string) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-sm bg-slate-50 border-slate-200 text-slate-700 px-3 py-1"
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                        {job.procedure.length > 3 && (
+                          <Badge
+                            variant="outline"
+                            className="text-sm bg-slate-50 border-slate-200 text-slate-700 px-3 py-1"
+                          >
+                            +{job.procedure.length - 3} more
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Enhanced Payment Section with Blue Color Scheme */}
+                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 min-w-[220px] shadow-sm">
+                      
+                      {!job.two_rates && <div className="flex items-center mb-4">
+                        <div className="w-6 h-6 rounded-md bg-blue-200 flex items-center justify-center mr-3">
+                          <Clock className="h-4 w-4 text-blue-700" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">Duration</p>
+                          <p className="font-semibold text-blue-900 text-base">
+                           {`${job.start_time.split(":")[0]}:${job.start_time.split(":")[1]} - ${job.end_time.split(":")[0]}:${job.end_time.split(":")[1]}`}
+                          </p>
+                        </div>
+                      </div>}
+
+                      {job.two_rates &&<div className="flex items-center mb-4">
+                        <div className="w-6 h-6 rounded-md bg-blue-200 flex items-center justify-center mr-3">
+                          <Clock className="h-4 w-4 text-blue-700" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">Day Shift</p>
+                          <p className="font-semibold text-blue-900 text-base">
+                           {`${job.start_day_time.split(":")[0]}:${job.start_day_time.split(":")[1]} - ${job.end_day_time.split(":")[0]}:${job.end_day_time.split(":")[1]}`}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="ml-4 text-sm font-medium text-blue-600 uppercase tracking-wide">Night Shift</p>
+                          <p className="ml-4 font-semibold text-blue-900 text-base">
+                           {`${job.start_night_time.split(":")[0]}:${job.start_night_time.split(":")[1]} - ${job.end_night_time.split(":")[0]}:${job.end_night_time.split(":")[1]}`}
+                          </p>
+                        </div>
+                      </div>}
+
+                      
+                      <div className="grid grid-cols-2 gap-3">
+
+                        {!job.two_rates && <div className="bg-white/70 border border-blue-200 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-4 w-4 text-blue-600 mr-1" />
+                            <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">Rate</p>
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">
+                            RM {job.rate}
+                            <span className="text-sm font-medium text-blue-600">/hr</span>
+                          </div>
+                        </div>}
+
+                        {job.two_rates && <div className="bg-white/70 border border-blue-200 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-4 w-4 text-blue-600 mr-1" />
+                            <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">Day Rate</p>
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">
+                            RM {job.day_rate}
+                            <span className="text-sm font-medium text-blue-600">/hr</span>
+                          </div>
+                        </div>}
+
+                        {job.two_rates && <div className="bg-white/70 border border-blue-200 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-4 w-4 text-blue-600 mr-1" />
+                            <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">Night Rate</p>
+                          </div>
+                          <div className="text-lg font-bold text-blue-700">
+                            RM {job.night_rate}
+                            <span className="text-sm font-medium text-blue-600">/hr</span>
+                          </div>
+                        </div>}
+
+
+                        {/* Total Pay */}
+                        {job.two_rates && <div className="bg-blue-200/50 border border-blue-300 rounded-lg p-3 text-center w-full col-span-2">
+                          <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-4 w-4 text-blue-700 mr-1" />
+                            <p className="text-sm font-medium text-blue-700 uppercase tracking-wide">Total</p>
+                          </div>
+                          <div className="text-lg font-bold text-blue-800">RM {job.total_pay}</div>
+                        </div>}
+
+                        {!job.two_rates && <div className="bg-blue-200/50 border border-blue-300 rounded-lg p-3 text-center">
+                          <div className="flex items-center justify-center mb-2">
+                            <DollarSign className="h-4 w-4 text-blue-700 mr-1" />
+                            <p className="text-sm font-medium text-blue-700 uppercase tracking-wide">Total</p>
+                          </div>
+                          <div className="text-lg font-bold text-blue-800">RM {job.total_pay}</div>
+                        </div>}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          ))
+        ) : (
+          <div className="text-center py-12">
+            <p className="text-slate-500">No jobs match your search criteria.</p>
+            <Button variant="outline" className="mt-4" onClick={clearFilters}>
+              Clear Filters
+            </Button>
+          </div>
+        )}
+      </div>
+    </div>
   )
 }

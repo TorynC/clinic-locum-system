@@ -1,0 +1,173 @@
+"use client";
+import { useState, useEffect } from "react";
+import axiosInstance from "@/utils/axiosinstance";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { CheckCircle, Upload } from "lucide-react";
+import React from "react";
+
+export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ id: string }>}) {
+  const { id } = React.use(params);
+
+  const [doctor, setDoctor] = useState<any>(null);
+  const [profile, setProfile] = useState<any>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const doctorRes = await axiosInstance.get(`/get-doctor/${id}`);
+        if (!doctorRes.data.error) setDoctor(doctorRes.data.doctor);
+
+        const profileRes = await axiosInstance.get(`/get-doctor-profile/${id}`);
+        if (!profileRes.data.error) setProfile(profileRes.data.results);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  if (!doctor || !profile) {
+    return <div className="p-8 text-center text-gray-500">Loading profile...</div>;
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto py-10 space-y-8">
+      <Card className="border-purple-100">
+        <CardContent className="flex flex-col md:flex-row gap-8 p-6">
+          {/* Profile Picture & Certificates */}
+          <div className="flex flex-col items-center gap-4 md:w-1/3">
+            <div className="w-32 h-32 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-4xl font-medium overflow-hidden">
+              {profile.profile_pic ? (
+                <img
+                  src={`http://localhost:5000/${profile.profile_pic.replace(/\\/g, "/")}`}
+                  alt="Profile"
+                  className="w-32 h-32 object-cover rounded-full"
+                />
+              ) : (
+                <span>{doctor.name?.split(" ").map((n: string) => n[0]).join("")}</span>
+              )}
+            </div>
+            {profile.verified && (
+              <Badge
+                variant="outline"
+                className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1"
+              >
+                <CheckCircle className="h-3.5 w-3.5" />
+                Verified
+              </Badge>
+            )}
+            <div className="space-y-2 w-full">
+              <div>
+                <span className="font-semibold">MMC Certificate:</span>{" "}
+                {profile.mmc_file ? (
+                  <a
+                    href={`http://localhost:5000/${profile.mmc_file.replace(/\\/g, "/")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-700 underline"
+                  >
+                    View MMC
+                  </a>
+                ) : (
+                  <span className="text-gray-400">Not uploaded</span>
+                )}
+              </div>
+              <div>
+                <span className="font-semibold">APC Certificate:</span>{" "}
+                {profile.apc_file ? (
+                  <a
+                    href={`http://localhost:5000/${profile.apc_file.replace(/\\/g, "/")}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-purple-700 underline"
+                  >
+                    View APC
+                  </a>
+                ) : (
+                  <span className="text-gray-400">Not uploaded</span>
+                )}
+              </div>
+            </div>
+          </div>
+          {/* Doctor Info */}
+          <div className="flex-1 space-y-4">
+            <div>
+              <h2 className="text-2xl font-bold text-purple-900">{doctor.name}</h2>
+              <div className="text-gray-500">{profile.specialization || "No specialization"}</div>
+              <div className="text-sm text-gray-500 mt-1">
+                {profile.experience_years != null ? `${profile.experience_years} years experience` : ""}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <div className="font-medium text-slate-900">Contact</div>
+                <div className="text-sm text-gray-700">{doctor.email}</div>
+                <div className="text-sm text-gray-700">{profile.phone}</div>
+              </div>
+              <div>
+                <div className="font-medium text-slate-900">Location</div>
+                <div className="text-sm text-gray-700">{profile.address}</div>
+                <div className="text-sm text-gray-700">
+                  {profile.city}, {profile.state} {profile.postal}
+                </div>
+              </div>
+            </div>
+            <div>
+              <div className="font-medium text-slate-900">Bio</div>
+              <div className="text-sm text-gray-700">{profile.bio || "No bio provided."}</div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {profile.skills?.map((skill: string) => (
+                <Badge key={skill} className="bg-purple-100 text-purple-700">
+                  {skill}
+                </Badge>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-2 mt-2">
+              {profile.languages?.map((lang: string) => (
+                <Badge key={lang} className="bg-blue-100 text-blue-700">
+                  {lang}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Work Experience */}
+      <Card className="border-purple-100">
+        <CardHeader>
+          <CardTitle className="text-purple-900">Professional Experience</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {profile.work_experience && profile.work_experience.length > 0 ? (
+            profile.work_experience.map((exp: any) => (
+              <div
+                key={exp.id}
+                className="p-4 border border-purple-100 rounded-lg bg-purple-50"
+              >
+                <div className="flex flex-col md:flex-row md:items-center gap-2">
+                  <div className="flex-1">
+                    <div className="font-semibold">{exp.title}</div>
+                    <div className="text-sm text-gray-700">{exp.place}</div>
+                    <div className="text-xs text-gray-500">{exp.year}</div>
+                  </div>
+                  <div className="text-sm text-gray-600">{exp.description}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-gray-400">No experience listed.</div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

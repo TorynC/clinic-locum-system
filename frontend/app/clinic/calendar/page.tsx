@@ -7,15 +7,10 @@ import {
   ChevronLeft,
   ChevronRight,
   Plus,
-  Filter,
-  CalendarIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { getWeek, isToday } from "date-fns";
-import next from "next";
 import axiosInstance from "@/utils/axiosinstance";
-import { parseISO, setHours, setMinutes, setSeconds } from 'date-fns';
 
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
@@ -192,7 +187,7 @@ export default function CalendarPage() {
     switch (status) {
       case "posted":
         return "bg-purple-100 border border-purple-400 text-purple-800";
-      case "accepted":
+      case "Accepted":
         return "bg-green-100 border border-green-400 text-green-800";
       case "completed":
         return "bg-indigo-100 border border-indigo-400 text-indigo-800";
@@ -253,14 +248,6 @@ export default function CalendarPage() {
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              {/*<Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-purple-200 text-purple-700"
-              >
-                <CalendarIcon className="h-4 w-4" />
-                Today
-              </Button>*/}
               <select
                 className="h-9 rounded-md border border-purple-200 bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
                 value={viewMode}

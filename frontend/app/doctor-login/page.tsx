@@ -27,6 +27,7 @@ export default function doctorLoginPage() {
 
       console.log("Login successful", response.data);
       localStorage.setItem("doctorId", response.data.id);
+      localStorage.setItem("doctorAccessToken", response.data.accessToken)
       
       router.push("/doctor");
     } catch (error) {

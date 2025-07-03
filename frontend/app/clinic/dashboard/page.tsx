@@ -1,71 +1,133 @@
-import type React from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Search, Download, ArrowUpDown } from "lucide-react"
+"use client";
+import type React from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Search, Download, ArrowUpDown, Heart } from "lucide-react";
+import { useState, useEffect } from "react";
+import axiosInstance from "@/utils/axiosinstance";
+import Link from "next/link";
 
 export default function DashboardPage() {
-  // Mock data for locum shifts
-  const shifts = [
-    {
-      id: 1,
-      date: "May 10, 2025",
-      timeSlot: "9:00 AM - 5:00 PM",
-      hours: 8,
-      pay: "$680",
-      doctor: "Dr. Sarah Johnson",
-      status: "Completed",
-    },
-    {
-      id: 2,
-      date: "May 8, 2025",
-      timeSlot: "10:00 AM - 6:00 PM",
-      hours: 8,
-      pay: "$680",
-      doctor: "Dr. Michael Chen",
-      status: "Completed",
-    },
-    {
-      id: 3,
-      date: "May 5, 2025",
-      timeSlot: "8:00 AM - 4:00 PM",
-      hours: 8,
-      pay: "$680",
-      doctor: "Dr. Emily Patel",
-      status: "Completed",
-    },
-    {
-      id: 4,
-      date: "May 15, 2025",
-      timeSlot: "9:00 AM - 5:00 PM",
-      hours: 8,
-      pay: "$680",
-      doctor: "Dr. James Wilson",
-      status: "Upcoming",
-    },
-    {
-      id: 5,
-      date: "May 18, 2025",
-      timeSlot: "10:00 AM - 2:00 PM",
-      hours: 4,
-      pay: "$340",
-      doctor: "Dr. Robert Kim",
-      status: "Upcoming",
-    },
-  ]
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [doctors, setDoctors] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [favoriteDoctors, setFavoriteDoctors] = useState<string[]>([]);
 
-  // Calculate statistics
-  const totalHours = shifts.reduce((sum, shift) => sum + shift.hours, 0)
-  const totalPay = shifts.reduce((sum, shift) => sum + Number.parseInt(shift.pay.replace("$", "")), 0)
-  const completedShifts = shifts.filter((shift) => shift.status === "Completed").length
-  const upcomingShifts = shifts.filter((shift) => shift.status === "Upcoming").length
+  // get jobs
+  const getJobs = async () => {
+    try {
+      const response = await axiosInstance.get(`/get-jobs/${clinicId}/jobs`);
+      if (!response.data.error) {
+        setJobs(response.data.jobs);
+        console.log("retrieved jobs!");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // function to get all doctors
+  const getDoctors = async () => {
+    try {
+      const response = await axiosInstance.get("/get-doctors");
+      if (!response.data.error) {
+        console.log("Doctors retrieved successfully");
+        setDoctors(response.data.doctors);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // function to favorite a doctor
+  const favoriteDoctor = async (doctorId: string) => {
+    try {
+      const response = await axiosInstance.post("/favorite-doctor", {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+      });
+      if (!response.data.error) {
+        console.log("favorite doctor added");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  // function to remove favorite doctor
+  const removeFavoriteDoctor = async (doctorId: string) => {
+    try {
+      await axiosInstance.delete(
+        `/favorite-doctor?clinic_id=${clinicId}&doctor_id=${doctorId}`
+      );
+      console.log("favorite doctor removed");
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("clinicId");
+    if (storedId) {
+      setClinicId(storedId);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (clinicId) {
+      getJobs();
+      getDoctors();
+    }
+  }, [clinicId]);
+
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      if (!clinicId) return;
+      try {
+        const response = await axiosInstance.get(
+          `/favorite-doctors/${clinicId}`
+        );
+        if (!response.data.error) {
+          setFavoriteDoctors(response.data.favoriteDoctorIds);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchFavorites();
+  }, [clinicId]);
+
+  const toggleFavorite = (doctorId: string) => {
+    setFavoriteDoctors((prev) =>
+      prev.includes(doctorId)
+        ? prev.filter((id) => id !== doctorId)
+        : [...prev, doctorId]
+    );
+  };
+
+  // Only completed jobs
+  const completedJobs = jobs.filter((shift) => shift.status === "Completed");
+
+  // Stats for completed jobs
+  const totalHours = completedJobs.reduce(
+    (sum, shift) => sum + (shift.duration || 0),
+    0
+  );
+  const totalPay = completedJobs.reduce(
+    (sum, shift) => sum + Number(shift.total_pay || 0),
+    0
+  );
+  const completedShifts = completedJobs.length;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">Dashboard</h1>
-          <p className="text-gray-500">History of locum shifts and statistics</p>
+          <h1 className="text-3xl font-bold text-black">Dashboard</h1>
+          <p className="text-gray-500">
+            History of locum shifts and statistics
+          </p>
         </div>
         <Button className="bg-purple-gradient hover:bg-purple-700">
           <Download className="h-4 w-4 mr-2" />
@@ -73,21 +135,23 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
-        <StatCard title="Total Hours" value={`${totalHours} hrs`} />
-        <StatCard title="Total Pay" value={`$${totalPay}`} />
+      <div className="grid gap-6 md:grid-cols-3">
+        <StatCard title="Total Hours" value={`${totalHours.toFixed(1)} hrs`} />
+        <StatCard title="Total Pay" value={`RM ${totalPay.toFixed(2)}`} />
         <StatCard title="Completed Shifts" value={completedShifts.toString()} />
-        <StatCard title="Upcoming Shifts" value={upcomingShifts.toString()} />
       </div>
 
       <Card className="border-purple-100">
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-purple-900">Shift History</CardTitle>
+            <CardTitle className="text-black-900">Shift History</CardTitle>
             <div className="flex items-center space-x-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-                <Input placeholder="Search shifts..." className="pl-8 border-purple-200" />
+                <Input
+                  placeholder="Search shifts..."
+                  className="pl-8 border-purple-200"
+                />
               </div>
               <select className="h-10 rounded-md border border-purple-200 bg-background px-3 py-2 text-sm">
                 <option value="all">All Shifts</option>
@@ -113,38 +177,89 @@ export default function DashboardPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-purple-100">
-                {shifts.map((shift) => (
-                  <tr key={shift.id} className="hover:bg-purple-50 transition-colors">
-                    <TableCell>{shift.date}</TableCell>
-                    <TableCell>{shift.timeSlot}</TableCell>
-                    <TableCell>{shift.hours}</TableCell>
-                    <TableCell>{shift.pay}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center">
-                        <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 mr-2 flex items-center justify-center text-xs font-medium">
-                          {shift.doctor.charAt(0)}
+                {completedJobs.map((shift) => {
+                  const doctorObj = doctors.find(
+                    (d) => d.id === shift.doctor_id
+                  );
+                  return shift.status === "Completed" ? (
+                    <tr
+                      key={shift.id}
+                      className="hover:bg-purple-50 transition-colors"
+                    >
+                      <TableCell>
+                        {new Date(shift.date).toLocaleDateString("en-MY", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          timeZone: "Asia/Kuala_Lumpur",
+                        })}
+                      </TableCell>
+                      <TableCell>
+                        {shift.start_time.split(":")[0]}:
+                        {shift.start_time.split(":")[1]} -{" "}
+                        {shift.end_time.split(":")[0]}:
+                        {shift.end_time.split(":")[1]}
+                      </TableCell>
+                      <TableCell>{shift.duration}</TableCell>
+                      <TableCell>RM {shift.total_pay}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2 ">
+                          <Link
+                            className="hover:underline"
+                            href={`/clinic/doctors/${doctorObj?.id}`}
+                          >
+                            {doctorObj?.name}
+                          </Link>
+                          <button
+                            type="button"
+                            className="focus:outline-none"
+                            onClick={() => {
+                              toggleFavorite(doctorObj?.id);
+                              if (favoriteDoctors.includes(doctorObj?.id)) {
+                                removeFavoriteDoctor(doctorObj.id);
+                              } else {
+                                favoriteDoctor(doctorObj.id);
+                              }
+                            }}
+                            aria-label="Favorite doctor"
+                          >
+                            <Heart
+                              className={
+                                favoriteDoctors.includes(doctorObj?.id)
+                                  ? "text-red-500 fill-red-500"
+                                  : "text-gray-400"
+                              }
+                              fill={
+                                favoriteDoctors.includes(doctorObj?.id)
+                                  ? "currentColor"
+                                  : "none"
+                              }
+                              size={18}
+                            />
+                          </button>
                         </div>
-                        {shift.doctor}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          shift.status === "Completed" ? "bg-green-100 text-green-800" : "bg-purple-100 text-purple-800"
-                        }`}
-                      >
-                        {shift.status}
-                      </span>
-                    </TableCell>
-                  </tr>
-                ))}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            shift.status === "Completed"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-purple-100 text-purple-800"
+                          }`}
+                        >
+                          {shift.status}
+                        </span>
+                      </TableCell>
+                    </tr>
+                  ) : null;
+                })}
               </tbody>
             </table>
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 function StatCard({ title, value }: { title: string; value: string }) {
@@ -156,7 +271,7 @@ function StatCard({ title, value }: { title: string; value: string }) {
         <p className="text-3xl font-bold text-purple-900 mt-2">{value}</p>
       </CardContent>
     </Card>
-  )
+  );
 }
 
 function TableHeader({ children }: { children: React.ReactNode }) {
@@ -164,9 +279,13 @@ function TableHeader({ children }: { children: React.ReactNode }) {
     <th className="px-6 py-3 text-left text-xs font-medium text-purple-900 uppercase tracking-wider">
       <div className="flex items-center">{children}</div>
     </th>
-  )
+  );
 }
 
 function TableCell({ children }: { children: React.ReactNode }) {
-  return <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{children}</td>
+  return (
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+      {children}
+    </td>
+  );
 }

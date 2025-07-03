@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Link from "next/link"
-import { Calendar, BarChart3, Home, Settings, User, Briefcase, LogOut, Bell, Stethoscope } from "lucide-react"
+import { Calendar, BarChart3, Home, User, Briefcase, LogOut, Bell, Stethoscope } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -63,12 +63,6 @@ export default function DoctorSidebar() {
           icon={<Bell className="w-5 h-5" />}
           label="Notifications"
           isActive={pathname.startsWith("/doctor/notifications")}
-        />
-        <SidebarLink
-          href="/doctor/settings"
-          icon={<Settings className="w-5 h-5" />}
-          label="Settings"
-          isActive={pathname.startsWith("/doctor/settings")}
         />
       </nav>
 

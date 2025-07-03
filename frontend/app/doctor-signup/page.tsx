@@ -46,9 +46,9 @@ export default function doctorSignUpPage() {
 
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-b from-purple-50 to-white p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-white p-4">
         <div className="text-center mb-12">
-        <h1 className="text-4xl md:text-4xl font-bold text-purple-900 mb-10">Doctor Signup</h1>
+        <h1 className="text-4xl md:text-4xl font-bold text-black-900 mb-10">Doctor Signup</h1>
         <div className="grid md:grid-cols-1 gap-8 w-full max-w-4xl">
             <Card className="border-purple-100 hover:shadow-md transition-shadow">
                 <CardContent className="p-8">
@@ -82,11 +82,11 @@ export default function doctorSignUpPage() {
                         className="mt-4"
                         required
                       />
-                      <Button type="submit" className="bg-purple-gradient hover:bg-purple-700 w-full mt-8">
+                      <Button type="submit" className="bg-blue-700 hover:bg-blue-900 w-full mt-8">
                         Signup
                       </Button>
                       </form>
-                      <Button asChild className="bg-purple-gradient hover:bg-purple-700 w-full mt-4">
+                      <Button asChild className="bg-blue-700 hover:bg-blue-900 w-full mt-4">
                         <Link href="/doctor-login">Cancel</Link>
                       </Button>
                 </CardContent>                

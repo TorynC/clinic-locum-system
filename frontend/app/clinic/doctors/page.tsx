@@ -1,11 +1,92 @@
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
-import { Search, Plus, Star, StarOff, FileText, MessageSquare } from "lucide-react"
+"use client";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Search,
+  Plus,
+  Star,
+  StarOff,
+  FileText,
+  MessageSquare,
+  Heart,
+  HeartOff,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import axiosInstance from "@/utils/axiosinstance";
+import Link from "next/link";
 
 export default function DoctorsPage() {
+  const [allDoctors, setAllDoctors] = useState<any[]>([]);
+  const [favoriteDoctorIds, setFavoriteDoctorIds] = useState<string[]>([]);
+  const [clinicId, setClinicId] = useState<string | null>(null);
+  const [doctorProfiles, setDoctorProfiles] = useState<any[]>([]);
+
+  const getDoctorProfiles = async () => {
+    try {
+      const response = await axiosInstance.get("/get-all-doctor-profile");
+      if (!response.data.error) {
+        console.log("Doctor profiles received successfully");
+        setDoctorProfiles(response.data.doctors);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  useEffect(() => {
+    const storedId = localStorage.getItem("clinicId");
+    if (storedId) setClinicId(storedId);
+  }, []);
+
+  useEffect(() => {
+    if (!clinicId) return;
+    // Fetch all doctors
+    axiosInstance.get("/get-doctors").then((res) => {
+      if (!res.data.error) setAllDoctors(res.data.doctors);
+    });
+    // Fetch favorite doctor IDs
+    axiosInstance.get(`/favorite-doctors/${clinicId}`).then((res) => {
+      if (!res.data.error) setFavoriteDoctorIds(res.data.favoriteDoctorIds);
+    });
+
+    getDoctorProfiles();
+  }, [clinicId]);
+
+  // Toggle favorite
+  const toggleFavorite = async (doctorId: string) => {
+    if (!clinicId) return;
+    if (favoriteDoctorIds.includes(doctorId)) {
+      await axiosInstance.delete(
+        `/favorite-doctor?clinic_id=${clinicId}&doctor_id=${doctorId}`
+      );
+      setFavoriteDoctorIds((ids) => ids.filter((id) => id !== doctorId));
+    } else {
+      await axiosInstance.post("/favorite-doctor", {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+      });
+      setFavoriteDoctorIds((ids) => [...ids, doctorId]);
+    }
+  };
+
+  // Preferred doctors
+  const preferredDoctors = allDoctors.filter((d) =>
+    favoriteDoctorIds.includes(d.id)
+  );
+  // Non-preferred doctors
+  const nonPreferredDoctors = allDoctors.filter(
+    (d) => !favoriteDoctorIds.includes(d.id)
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -13,132 +94,99 @@ export default function DoctorsPage() {
           <h1 className="text-3xl font-bold">Preferred Doctors</h1>
           <p className="text-gray-500">Manage your preferred locum doctors</p>
         </div>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Doctor
-        </Button>
-      </div>
-
-      <div className="flex items-center space-x-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
-          <Input placeholder="Search doctors by name, specialty, or skills..." className="pl-8" />
-        </div>
-        <select className="h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-          <option value="">All Specialties</option>
-          <option value="general">General Practice</option>
-          <option value="pediatric">Pediatrics</option>
-          <option value="dental">Dental</option>
-          <option value="emergency">Emergency</option>
-        </select>
       </div>
 
       <Tabs defaultValue="preferred">
         <TabsList>
           <TabsTrigger value="preferred">Preferred Doctors</TabsTrigger>
-          <TabsTrigger value="previous">Previously Hired</TabsTrigger>
           <TabsTrigger value="all">All Doctors</TabsTrigger>
         </TabsList>
 
         <TabsContent value="preferred" className="mt-6">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                name: "Dr. Sarah Johnson",
-                specialty: "General Practice",
-                experience: "8 years",
-                languages: ["English", "Spanish"],
-                skills: ["Family Medicine", "Preventive Care"],
-              },
-              {
-                name: "Dr. Michael Chen",
-                specialty: "Pediatrics",
-                experience: "5 years",
-                languages: ["English", "Mandarin"],
-                skills: ["Child Development", "Vaccinations"],
-              },
-              {
-                name: "Dr. Emily Patel",
-                specialty: "Dental",
-                experience: "10 years",
-                languages: ["English", "Hindi"],
-                skills: ["General Dentistry", "Cosmetic Dentistry"],
-              },
-            ].map((doctor, i) => (
-              <DoctorCard key={i} doctor={doctor} preferred={true} />
-            ))}
-          </div>
-        </TabsContent>
-
-        <TabsContent value="previous" className="mt-6">
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                name: "Dr. James Wilson",
-                specialty: "Emergency Medicine",
-                experience: "12 years",
-                languages: ["English"],
-                skills: ["Trauma Care", "Critical Care"],
-              },
-              {
-                name: "Dr. Robert Kim",
-                specialty: "General Practice",
-                experience: "7 years",
-                languages: ["English", "Korean"],
-                skills: ["Family Medicine", "Geriatrics"],
-              },
-            ].map((doctor, i) => (
-              <DoctorCard key={i} doctor={doctor} preferred={false} />
+            {preferredDoctors.length === 0 && (
+              <div className="text-gray-500 col-span-full">
+                No preferred doctors yet.
+              </div>
+            )}
+            {preferredDoctors.map((doctor) => (
+              <DoctorCard
+                key={doctor.id}
+                doctor={doctor}
+                preferred={true}
+                onToggleFavorite={() => toggleFavorite(doctor.id)}
+                doctorProfiles={doctorProfiles}
+              />
             ))}
           </div>
         </TabsContent>
 
         <TabsContent value="all" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>All Available Doctors</CardTitle>
-              <CardDescription>Browse all doctors available on the platform</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <p className="text-center py-8 text-gray-500">This feature will be available in the next update.</p>
-            </CardContent>
-          </Card>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {allDoctors.length === 0 && (
+              <div className="text-gray-500 col-span-full">
+                No doctors found.
+              </div>
+            )}
+            {allDoctors.map((doctor) => (
+              <DoctorCard
+                key={doctor.id}
+                doctor={doctor}
+                preferred={favoriteDoctorIds.includes(doctor.id)}
+                onToggleFavorite={() => toggleFavorite(doctor.id)}
+                doctorProfiles={doctorProfiles}
+              />
+            ))}
+          </div>
         </TabsContent>
       </Tabs>
     </div>
-  )
+  );
 }
 
+// DoctorCard component with favorite toggle
 function DoctorCard({
   doctor,
   preferred,
+  onToggleFavorite,
+  doctorProfiles,
 }: {
-  doctor: {
-    name: string
-    specialty: string
-    experience: string
-    languages: string[]
-    skills: string[]
-  }
-  preferred: boolean
+  doctor: any;
+  preferred: boolean;
+  onToggleFavorite: () => void;
+  doctorProfiles: any[];
 }) {
+  const profile = doctorProfiles.find((p) => p.id === doctor.id);
+
+  const languages = profile?.languages || [];
+  const skills = profile?.skills || [];
+
   return (
     <Card>
       <CardContent className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center">
             <div className="w-12 h-12 rounded-full bg-gray-200 mr-3 flex items-center justify-center text-lg font-medium">
-              {doctor.name.charAt(0)}
+              {doctor.name?.charAt(0) || "D"}
             </div>
             <div>
               <h3 className="font-medium">{doctor.name}</h3>
               <p className="text-sm text-gray-500">
-                {doctor.specialty} • {doctor.experience}
+                {doctor.specialty || "General Practice"}
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="icon" className="text-yellow-500">
-            {preferred ? <Star className="h-5 w-5 fill-yellow-500" /> : <StarOff className="h-5 w-5" />}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-red-500"
+            onClick={onToggleFavorite}
+          >
+            {preferred ? (
+              <Heart className="h-5 w-5 fill-red-500" />
+            ) : (
+              <HeartOff className="h-5 w-5" />
+            )}
           </Button>
         </div>
 
@@ -146,7 +194,7 @@ function DoctorCard({
           <div>
             <p className="text-xs font-medium text-gray-500 mb-1">LANGUAGES</p>
             <div className="flex flex-wrap gap-1">
-              {doctor.languages.map((language) => (
+              {languages.map((language: string) => (
                 <Badge key={language} variant="outline" className="text-xs">
                   {language}
                 </Badge>
@@ -157,7 +205,7 @@ function DoctorCard({
           <div>
             <p className="text-xs font-medium text-gray-500 mb-1">SKILLS</p>
             <div className="flex flex-wrap gap-1">
-              {doctor.skills.map((skill) => (
+              {skills.map((skill: string) => (
                 <Badge key={skill} variant="outline" className="text-xs">
                   {skill}
                 </Badge>
@@ -169,14 +217,10 @@ function DoctorCard({
         <div className="flex items-center justify-between mt-4 pt-4 border-t">
           <Button variant="outline" size="sm" className="gap-1">
             <FileText className="h-4 w-4" />
-            View Profile
-          </Button>
-          <Button size="sm" className="gap-1">
-            <MessageSquare className="h-4 w-4" />
-            Contact
+            <Link href={`/clinic/doctors/${doctor.id}`}>View Profile</Link>
           </Button>
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

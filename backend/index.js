@@ -1,4 +1,3 @@
-
 const express = require("express");
 const cors = require("cors");
 const pool = require("./db"); 
@@ -8,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const {authenticateToken} = require("./utilities");
 const multer = require("multer")
 const path = require('path');
-
+const cron = require('node-cron');
 
 require('dotenv').config();
 
@@ -37,6 +36,12 @@ app.use(
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
+async function createNotification({ user_id, user_type, type, title, message }) {
+    await pool.query(
+        `INSERT INTO notifications (user_id, user_type, type, title, message) VALUES ($1, $2, $3, $4, $5)`,
+        [user_id, user_type, type, title, message]
+    );
+}
 
 //test API route to check if the server is running
 app.get('/api/test', (req, res) => {
@@ -52,6 +57,17 @@ app.get('/api/test-db', async (req, res) => {
         return res.json(error);
     }
 });
+
+// change the status of a job to completed when the time has past 
+cron.schedule('*/10 * * * *', async () => {
+    try {
+        await pool.query(`UPDATE manual_jobs SET status = 'Completed' WHERE status != 'Completed'
+            AND (date + end_time::interval) < NOW()`);
+            console.log('Completed jobs updated');
+    } catch (error) {
+        console.error("Error updating completed jobs:", error);
+    }
+})
 
 // Delete Job 
 app.delete("/api/delete-job/:jobId", authenticateToken, async (req, res) => {
@@ -94,6 +110,62 @@ app.post('/api/clinic-register', async (req, res) => {
     } catch (error) {
         console.error("Error creating clinic:", error);
         return res.status(500).json({ error: true, message: "Error creating clinic" });
+    }
+});
+
+// Add favorite doctor
+app.post("/api/favorite-doctor", authenticateToken, async (req, res) => {
+    const { clinic_id, doctor_id } = req.body;
+    if (!clinic_id || !doctor_id) {
+        return res.status(400).json({ error: true, message: "Missing clinic_id or doctor_id" });
+    }
+    try {
+        await pool.query(
+            "INSERT INTO favorite_doctors (clinic_id, doctor_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+            [clinic_id, doctor_id]
+        );
+        return res.status(200).json({ error: false, message: "Doctor favorited" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+app.get("/api/favorite-doctors/:clinicId", authenticateToken, async (req, res) => {
+    const clinicId = req.params.clinicId;
+    if (!clinicId) {
+        return res.status(400).json({ error: true, message: "Missing clinicId" });
+    }
+    try {
+        const result = await pool.query(
+            "SELECT doctor_id FROM favorite_doctors WHERE clinic_id = $1",
+            [clinicId]
+        );
+        // Return as an array of IDs
+        const favoriteDoctorIds = result.rows.map(row => row.doctor_id);
+        return res.status(200).json({ error: false, favoriteDoctorIds });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+
+// Remove favorite doctor
+app.delete("/api/favorite-doctor", authenticateToken, async (req, res) => {
+    const { clinic_id, doctor_id } = req.query;
+    if (!clinic_id || !doctor_id) {
+        return res.status(400).json({ error: true, message: "Missing clinic_id or doctor_id" });
+    }
+    try {
+        await pool.query(
+            "DELETE FROM favorite_doctors WHERE clinic_id = $1 AND doctor_id = $2",
+            [clinic_id, doctor_id]
+        );
+        return res.status(200).json({ error: false, message: "Doctor unfavorited" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
     }
 });
 
@@ -199,7 +271,7 @@ app.post("/api/doctor-login", async (req, res) => {
 
 // Clinic General Information API Route
 app.patch("/api/general-info/:id", authenticateToken, async (req, res) => {
-    const { type, description, year} = req.body;
+    const { type, description} = req.body;
 
     try {
         const clinicId = req.params.id;
@@ -208,11 +280,11 @@ app.patch("/api/general-info/:id", authenticateToken, async (req, res) => {
         }
 
         await pool.query(`
-            INSERT INTO clinic_general_info (id, type, description, year)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO clinic_general_info (id, type, description)
+            VALUES ($1, $2, $3)
             ON CONFLICT (id)
-            DO UPDATE SET type = $2, description = $3, year = $4
-            `, [clinicId, type, description, year])
+            DO UPDATE SET type = $2, description = $3
+            `, [clinicId, type, description])
         return res.status(200).json({error: false, message: "General info updated successfully"});
     } catch (error) {
         console.error(error);
@@ -237,87 +309,26 @@ app.get("/api/get-job/:jobId", authenticateToken, async(req, res) => {
 
 // edit job API 
 app.patch("/api/edit-job/:jobId", authenticateToken, async(req, res) => {
-    const { 
-        jobTitle: title,
-        date,
-        chosenLanguages: languages,
-        chosenProcedure: procedure,
-        preferredDoctors: preferred_doctors,
-        address,
-        email,
-        phone,
-        paidBreak: paid_break,
-        totalPay: total_pay,
-        dayRate: day_rate,
-        nightRate: night_rate,
-        dayStart: start_day_time,
-        dayEnd: end_day_time,
-        nightStart: start_night_time,
-        nightEnd: end_night_time,
-        jobDescription: description,
-        jobIncentives: incentives,
-        preferredGender: gender,
-        contactPerson: contact,
-        specialInstructions: special_instructions,
-        shiftStart: start_time,
-        shiftEnd: end_time,
-        status,
-        rate,
-        twoRates: two_rates,
-        duration
-    } = req.body;
-
+    const { date, start_time, end_time, rate, total_pay, duration } = req.body;
     try {
         const jobId = req.params.jobId;
         if (!jobId) {
             return res.status(400).json({error: true, message: "Job not found"})
         }
         await pool.query(
-            `UPDATE manual_jobs SET
-                title = $1,
-                procedure = $2,
-                description = $3,
-                incentives = $4,
-                day_rate = $5,
-                night_rate = $6,
-                total_pay = $7,
-                date = $8,
-                start_time = $9,
-                end_time = $10,
-                gender = $11,
-                languages = $12,
-                preferred_doctors = $13,
-                paid_break = $14,
-                start_day_time = $15,
-                end_day_time = $16,
-                start_night_time = $17,
-                end_night_time = $18,
-                contact = $19,
-                special_instructions = $20,
-                email = $21,
-                address = $22,
-                phone = $23,
-                status = $24,
-                rate = $25,
-                two_rates = $26,
-                duration = $27
-            WHERE id = $28`, [title, procedure, description, incentives, day_rate, 
-                night_rate, total_pay, date, start_time, end_time, gender, languages, 
-                preferred_doctors, paid_break, start_day_time, end_day_time, start_night_time, 
-                end_night_time, contact, special_instructions, email, address,
-                phone, status, rate, two_rates, duration, jobId
-            ]
-        )
+            `UPDATE manual_jobs SET date=$1, start_time=$2, end_time=$3, rate=$4, total_pay=$5, duration=$6 WHERE id=$7`,
+            [date, start_time, end_time, rate, total_pay, duration, jobId]
+        );
         return res.status(200).json({error: false, message: "Job updated successfully"})
     } catch (error) {
         console.error(error);
         return res.status(500).json({error: true, message: "Internal Server Error"})
     }
-})
+});
 
 // Clinic Contact Details API Route 
 app.patch("/api/contact-details/:id", authenticateToken, async (req, res) => {
-    const {address, city, postal, phone, website} = req.body;
+    const {address, city, state, postal, phone, website, doctor} = req.body;
 
     try {
         const clinicId = req.params.id;
@@ -327,15 +338,15 @@ app.patch("/api/contact-details/:id", authenticateToken, async (req, res) => {
         } 
 
         await pool.query(`
-            INSERT INTO clinic_contact_info (id, address, city, postal, phone, website) 
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO clinic_contact_info (id, address, city, state, postal, phone, website, doctor) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             ON CONFLICT (id)
-            DO UPDATE SET address = $2, city= $3 ,postal = $4 ,phone = $5,  website = $6
-            `, [clinicId, address, city, postal, phone, website])
-        return res.status(200).json({ error: false, message: "contact info updated successfully", address, city, postal, phone, website })
+            DO UPDATE SET address = $2, city= $3, state = $4, postal = $5, phone = $6, website = $7, doctor = $8
+            `, [clinicId, address, city, state, postal, phone, website, doctor]);
+        return res.status(200).json({ error: false, message: "contact info updated successfully", address, city, state, postal, phone, website, doctor });
     } catch (error) {
         console.error(error);
-        return res.status(400).json({ error: true, message: "Internal Server Error" })
+        return res.status(400).json({ error: true, message: "Internal Server Error" });
     } 
 });
 
@@ -385,19 +396,19 @@ app.patch("/api/name-email/:id", authenticateToken, async (req, res) => {
 
 // Clinic Preferences API Route 
 app.patch("/api/preferences/:id", authenticateToken, async (req, res) => {
-    const {dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors, twoRates, rate, start, end} = req.body;
+    const { qualifications, languages, preferredDoctors, rate, start, end, gender } = req.body;
     try {
         const clinicId = req.params.id;
         if (!clinicId) {
             return res.status(400).json({ error: true, message: "Clinic not found" });
         } 
         await pool.query(`
-            INSERT INTO clinic_preferences (id, day_rate, night_rate, day_start_time, day_end_time, night_start_time, night_end_time, qualifications, languages, preferred_doctors_only, two_rates, default_rate, start_time, end_time)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) 
+            INSERT INTO clinic_preferences (id, qualifications, languages, preferred_doctors_only, default_rate, start_time, end_time, gender)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
             ON CONFLICT (id)
-            DO UPDATE SET day_rate = $2, night_rate = $3, day_start_time = $4, day_end_time = $5, night_start_time = $6, night_end_time = $7, qualifications = $8, languages = $9, preferred_doctors_only = $10, two_rates = $11, default_rate = $12, start_time = $13, end_time = $14
-            `, [clinicId, dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors, twoRates, rate, start, end])
-        return res.status(200).json({ error: false, message: "preferences successfully updated", dayRate, nightRate, dayStart, dayEnd, nightStart, nightEnd, qualifications, languages, preferredDoctors, twoRates, rate, start, end})
+            DO UPDATE SET qualifications = $2, languages = $3, preferred_doctors_only = $4, default_rate = $5, start_time = $6, end_time = $7, gender = $8
+            `, [clinicId, qualifications, languages, preferredDoctors, rate, start, end, gender]);
+        return res.status(200).json({ error: false, message: "preferences successfully updated", qualifications, languages, preferredDoctors, rate, start, end, gender });
     } catch(error) {
         console.error(error);
         return res.status(400).json({error: true, message: "Internal Server Error"});
@@ -508,28 +519,92 @@ app.get("/api/get-doctor-profile/:doctorId", authenticateToken, async (req, res)
 // change job application status 
 app.patch("/api/update-job-application/:applicationId", authenticateToken, async (req, res) => {
     const applicationId = req.params.applicationId;
-    const {status} = req.body;
+    const { status } = req.body;
 
     if (!applicationId || !status) {
-        return res.status(400).json({error: true, message: "Application not found"})
+        return res.status(400).json({ error: true, message: "Application not found" });
     }
 
     try {
-        const result = await pool.query(`UPDATE job_applications SET status = $1 WHERE id = $2 RETURNING *`, 
+        const result = await pool.query(
+            `UPDATE job_applications SET status = $1 WHERE id = $2 RETURNING *`,
             [status, applicationId]
         );
         if (result.rows.length === 0) {
-            return res.status(400).json({error: true, message: "Application not found"});
+            return res.status(400).json({ error: true, message: "Application not found" });
         }
 
+        const application = result.rows[0];
+
         if (status === "Accepted") {
-            const application = result.rows[0];
-            await pool.query(`UPDATE manual_jobs SET doctor_id = $1, status = 'Accepted' WHERE id = $2`, [application.doctor_id, application.job_id])
+            await pool.query(
+                `UPDATE manual_jobs SET doctor_id = $1, status = 'Accepted' WHERE id = $2`,
+                [application.doctor_id, application.job_id]
+            );
+
+            // 1. Get the accepted job's date, start_time, end_time
+            const jobRes = await pool.query(
+                `SELECT date, start_time, end_time FROM manual_jobs WHERE id = $1`,
+                [application.job_id]
+            );
+            const acceptedJob = jobRes.rows[0];
+
+            // 2. Find all other applications by this doctor on the same date with overlapping time
+            const overlappingApps = await pool.query(
+                `SELECT ja.id, mj.start_time, mj.end_time
+                 FROM job_applications ja
+                 JOIN manual_jobs mj ON ja.job_id = mj.id
+                 WHERE ja.doctor_id = $1
+                   AND ja.id != $2
+                   AND mj.date = $3
+                   AND ja.status = 'Pending'
+                   AND (
+                        (mj.start_time < $5 AND mj.end_time > $4)
+                   )`,
+                [
+                    application.doctor_id,
+                    applicationId,
+                    acceptedJob.date,
+                    acceptedJob.start_time,
+                    acceptedJob.end_time
+                ]
+            );
+
+            // 3. Delete or update those applications
+            for (const app of overlappingApps.rows) {
+                await pool.query(
+                    `DELETE FROM job_applications WHERE id = $1`,
+                    [app.id]
+                );
+                // Notify the doctor
+                await createNotification({
+                    user_id: application.doctor_id,
+                    user_type: "doctor",
+                    type: "job_unavailable",
+                    title: "Job No Longer Available",
+                    message: `A job you applied for (Job ID: ${application.job_id}) is no longer available due to a scheduling conflict.`
+                });
+            }
+
+            await createNotification({
+                user_id: application.doctor_id,
+                user_type: "doctor",
+                type: "accepted",
+                title: "Application Accepted",
+                message: `Your application for Job ID: ${application.job_id} was accepted!`
+            });
+        } else if (status === "Rejected") {
+            // Only clear doctor_id if this doctor is currently assigned
+            await pool.query(
+                `UPDATE manual_jobs SET doctor_id = NULL, status = 'posted' WHERE id = $1 AND doctor_id = $2`,
+                [application.job_id, application.doctor_id]
+            );
         }
-        return res.status(200).json({error: false, message: "Application updated successfully", application: result.rows[0]})
+
+        return res.status(200).json({ error: false, message: "Application updated successfully", application: result.rows[0] });
     } catch (error) {
         console.error(error);
-        return res.status(500).json({error: true, message: "Internal Server Error"});
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
     }
 });
 
@@ -546,12 +621,6 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
         phone,
         paidBreak: paid_break,
         totalPay: total_pay,
-        dayRate: day_rate,
-        nightRate: night_rate,
-        dayStart: start_day_time,
-        dayEnd: end_day_time,
-        nightStart: start_night_time,
-        nightEnd: end_night_time,
         jobDescription: description,
         jobIncentives: incentives,
         preferredGender: gender,
@@ -561,8 +630,10 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
         shiftEnd: end_time,
         status,
         rate, 
-        twoRates: two_rates,
-        duration
+        duration,
+        shiftType: shift_type,
+        breakStart: break_start,
+        breakEnd: break_end
     } = req.body;
 
     try {
@@ -576,27 +647,24 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
 
         const queryText = `
             INSERT INTO manual_jobs (
-                clinic_id, title, procedure, description,
-                incentives, day_rate, night_rate, total_pay, date, 
+                clinic_id, procedure, description,
+                incentives, total_pay, date, 
                 start_time, end_time, gender, languages, 
-                preferred_doctors, paid_break, start_day_time, 
-                end_day_time, start_night_time, end_night_time, 
-                contact, special_instructions, email, address, phone, status, rate, two_rates, duration
+                preferred_doctors, paid_break,  
+                contact, special_instructions, email, address, phone, status, rate, duration,
+                shift_type, break_start, break_end
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15, $16, $17, $18,
-                $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+                $19, $20, $21, $22, $23
             ) RETURNING *
         `;
 
         const queryValues = [
             clinicId, 
-            title, 
             procedure, 
             description, 
             incentives, 
-            day_rate, 
-            night_rate,
             total_pay, 
             date, 
             start_time, 
@@ -605,10 +673,6 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
             formattedLanguages, 
             preferred_doctors,
             paid_break, 
-            start_day_time, 
-            end_day_time, 
-            start_night_time, 
-            end_night_time, 
             contact, 
             special_instructions,
             email, 
@@ -616,8 +680,10 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
             phone,
             status,
             rate,
-            two_rates,
-            duration
+            duration,
+            shift_type,
+            break_start,
+            break_end
         ];
 
         console.log('Executing query:', queryText);
@@ -653,6 +719,18 @@ app.post("/api/post-job-application", authenticateToken, async (req, res) => {
         const result = await pool.query("INSERT INTO job_applications(job_id, doctor_id, status) VALUES($1, $2, $3) RETURNING *",
             [job_id, doctor_id, status])
       
+        // After job application is inserted
+        const jobRes = await pool.query("SELECT clinic_id FROM manual_jobs WHERE id = $1", [job_id]);
+        if (jobRes.rows.length > 0) {
+            await createNotification({
+                user_id: jobRes.rows[0].clinic_id,
+                user_type: "clinic",
+                type: "application",
+                title: "New Application",
+                message: `A doctor applied for your job (Job ID: ${job_id}).`
+            });
+        }
+
         return res.status(200).json({error: false,  messsage: "Job application posted successfully", application: result.rows[0]})
         
     } catch(error) {
@@ -688,7 +766,7 @@ app.get("/api/clinic-applications/:clinicId", authenticateToken, async (req, res
                 ja.*, 
                 d.name AS doctor_name,  
                 d.email AS doctor_email,
-                mj.title AS job_title, 
+                mj.description AS job_description, -- use description instead of title
                 mj.date AS job_date,
                 mj.status AS job_status
             FROM job_applications ja
@@ -899,6 +977,91 @@ app.get("/api/get-all-clinics", authenticateToken, async(req, res) => {
         return res.status(500).json({error: true, message: "Internal Server Error"})
     }
 })
+
+// Doctor cancels a job (urgent re-list)
+app.patch("/api/cancel-job/:jobId", authenticateToken, async (req, res) => {
+    const { doctorId } = req.body;
+    const jobId = req.params.jobId;
+    if (!jobId || !doctorId) {
+        return res.status(400).json({ error: true, message: "Missing jobId or doctorId" });
+    }
+    try {
+        // Set job to urgent and remove doctor
+        await pool.query(
+            `UPDATE manual_jobs SET doctor_id = NULL, status = 'Urgent' WHERE id = $1`,
+            [jobId]
+        );
+        // Set the application to Cancelled
+        await pool.query(
+            `UPDATE job_applications SET status = 'Cancelled' WHERE job_id = $1 AND doctor_id = $2`,
+            [jobId, doctorId]
+        );
+        // Decrease reliability rating in doctor_profile (min 1.0)
+        await pool.query(
+            `UPDATE doctor_profile SET reliability_rating = GREATEST(COALESCE(reliability_rating, 5) - 0.1, 1.0) WHERE id = $1`,
+            [doctorId]
+        );
+        // After job is set to urgent and doctor removed
+        const jobRes = await pool.query("SELECT clinic_id FROM manual_jobs WHERE id = $1", [jobId]);
+        if (jobRes.rows.length > 0) {
+            await createNotification({
+                user_id: jobRes.rows[0].clinic_id,
+                user_type: "clinic",
+                type: "cancellation",
+                title: "Doctor Cancelled",
+                message: `A doctor cancelled their shift for Job ID: ${jobId}.`
+            });
+        }
+        return res.status(200).json({ error: false, message: "Job cancelled and set to urgent" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+// get doctor notifications
+app.get("/api/notifications/doctor/:doctorId", authenticateToken, async (req, res) => {
+    const doctorId = req.params.doctorId;
+    try {
+        const result = await pool.query(
+            "SELECT * FROM notifications WHERE user_id = $1 AND user_type = 'doctor' ORDER BY created_at DESC",
+            [doctorId]
+        );
+        res.json({ notifications: result.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+app.get("/api/notifications/clinic/:clinicId", authenticateToken, async (req, res) => {
+    const clinicId = req.params.clinicId;
+    try {
+        const result = await pool.query(
+            "SELECT * FROM notifications WHERE user_id = $1 AND user_type = 'clinic' ORDER BY created_at DESC",
+            [clinicId]
+        );
+        res.json({ notifications: result.rows });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
+
+// mark notification as read
+app.patch("/api/notifications/:id/read", authenticateToken, async (req, res) => {
+    const notificationId = req.params.id;
+    try {
+        await pool.query(
+            "UPDATE notifications SET is_read = TRUE WHERE id = $1",
+            [notificationId]
+        );
+        res.json({ success: true });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+});
 
 // Start server 
 app.listen(PORT, () => {

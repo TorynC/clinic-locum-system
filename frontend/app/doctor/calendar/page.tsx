@@ -15,20 +15,39 @@ import { cn } from "@/lib/utils";
 import { getWeek, isToday } from "date-fns";
 import next from "next";
 import axiosInstance from "@/utils/axiosinstance";
-import { parseISO, setHours, setMinutes, setSeconds } from 'date-fns';
+import { parseISO, setHours, setMinutes, setSeconds } from "date-fns";
 
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
   const [currentDate, setCurrentDate] = useState(new Date());
-  
+
   const [events, setEvents] = useState<any[]>([]);
+  const [jobs, setJobs] = useState<any[]>([]);
+  const [clinics, setClinics] = useState<any[]>([]);
+  const [doctorId, setDoctorId] = useState<string | null>(null);
 
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Generate calendar days (simplified for example)
   const calendarDays = getCalendarDays(currentDate);
-  
-  
+
+  useEffect(() => {
+    // Get doctorId from localStorage or context
+    const storedId = localStorage.getItem("doctorId");
+    if (storedId) setDoctorId(storedId);
+  }, []);
+
+  useEffect(() => {
+    if (!doctorId) return;
+    // Fetch all jobs
+    axiosInstance.get("/get-all-jobs").then((res) => {
+      if (!res.data.error) setJobs(res.data.jobs);
+    });
+    // Fetch all clinics (for clinic name lookup)
+    axiosInstance.get("/get-all-clinics").then((res) => {
+      if (!res.data.error) setClinics(res.data.clinics);
+    });
+  }, [doctorId]);
 
   // Get real calendar days
   function getCalendarDays(date: Date) {
@@ -59,7 +78,7 @@ export default function CalendarPage() {
       };
     });
   }
-  console.log(events)
+  console.log(events);
   function isSameDay(a: Date, b: Date) {
     return (
       a.getFullYear() === b.getFullYear() &&
@@ -87,29 +106,42 @@ export default function CalendarPage() {
 
   const nextWeek = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + 7)
-    setCurrentDate(newDate); 
+    newDate.setDate(currentDate.getDate() + 7);
+    setCurrentDate(newDate);
   };
 
   const prevWeek = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() - 7)
+    newDate.setDate(currentDate.getDate() - 7);
     setCurrentDate(newDate);
-  }
+  };
 
   const tomorrow = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() + 1);
     setCurrentDate(newDate);
-  }
+  };
 
   const yesterday = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() - 1);
     setCurrentDate(newDate);
-  }
+  };
 
-  const today = currentDate
+  const today = currentDate;
+
+  const confirmedJobs = jobs.filter(
+    (job) =>
+      job.doctor_id === doctorId &&
+      (job.status === "Accepted" || job.status === "Completed")
+  );
+
+  function getJobColor(status: string) {
+    if (status === "Completed")
+      return "bg-green-100 text-green-900 border border-green-400";
+    // Default to upcoming (Accepted)
+    return "bg-purple-100 text-purple-900 border border-purple-400";
+  }
 
   return (
     <div className="space-y-6">
@@ -126,7 +158,13 @@ export default function CalendarPage() {
                 variant="outline"
                 size="icon"
                 className="border-purple-200 text-purple-700"
-                onClick={viewMode === "month" ? prevMonth : viewMode === "week" ? prevWeek : yesterday}
+                onClick={
+                  viewMode === "month"
+                    ? prevMonth
+                    : viewMode === "week"
+                    ? prevWeek
+                    : yesterday
+                }
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -137,20 +175,18 @@ export default function CalendarPage() {
                 variant="outline"
                 size="icon"
                 className="border-purple-200 text-purple-700"
-                onClick={viewMode === "month" ? nextMonth : viewMode === "week" ? nextWeek : tomorrow}
+                onClick={
+                  viewMode === "month"
+                    ? nextMonth
+                    : viewMode === "week"
+                    ? nextWeek
+                    : tomorrow
+                }
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
             <div className="flex items-center space-x-2">
-              {/*<Button
-                variant="outline"
-                size="sm"
-                className="gap-2 border-purple-200 text-purple-700"
-              >
-                <CalendarIcon className="h-4 w-4" />
-                Today
-              </Button>*/}
               <select
                 className="h-9 rounded-md border border-purple-200 bg-background px-3 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
                 value={viewMode}
@@ -195,7 +231,37 @@ export default function CalendarPage() {
                         >
                           {day.date.getDate()}
                         </div>
-                        </div>
+                      </div>
+                      {/* Render confirmed jobs for this day */}
+                      {confirmedJobs
+                        .filter(
+                          (job) =>
+                            new Date(job.date).toDateString() ===
+                            day.date.toDateString()
+                        )
+                        .map((job) => {
+                          const clinic = clinics.find(
+                            (c) => c.id === job.clinic_id
+                          );
+                          return (
+                            <div
+                              key={job.id}
+                              className={cn(
+                                "mt-1 px-2 py-1 rounded text-xs font-medium flex items-center",
+                                getJobColor(job.status)
+                              )}
+                            >
+                              <span className="truncate">
+                                {clinic?.clinic_name ||
+                                  job.clinic_name ||
+                                  "Clinic"}
+                              </span>
+                              <span className="ml-2">
+                                {job.start_time} - {job.end_time}
+                              </span>
+                            </div>
+                          );
+                        })}
                     </>
                   )}
                 </div>
@@ -208,7 +274,10 @@ export default function CalendarPage() {
                 {getWeekDays(currentDate).map((day, i) => (
                   <div
                     key={i}
-                    className={ cn("border-r border-b p-2 text-center bg-purple-50 font-semibold", day.isToday && "bg-purple-300")}
+                    className={cn(
+                      "border-r border-b p-2 text-center bg-purple-50 font-semibold",
+                      day.isToday && "bg-purple-300"
+                    )}
                   >
                     {days[day.date.getDay()]} {day.date.getDate()}
                   </div>
@@ -217,19 +286,54 @@ export default function CalendarPage() {
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-purple-50 text-gray-500 flex flex-col ">
-                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
+                      {hour === 0
+                        ? "12AM"
+                        : hour < 12
+                        ? `${hour}AM`
+                        : hour === 12
+                        ? "12PM"
+                        : `${hour - 12}PM`}
                     </div>
-                      {getWeekDays(currentDate).map((day, i) => (
-                    <div
-                      key={i}
-                      className="border-r border-b h-25 hover:bg-purple-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex "
-                    >
-                      
-                    </div>
-                  ))}
+                    {getWeekDays(currentDate).map((day, i) => (
+                      <div
+                        key={i}
+                        className="border-r border-b h-25 hover:bg-purple-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex"
+                      >
+                        {confirmedJobs
+                          .filter(
+                            (job) =>
+                              new Date(job.date).toDateString() ===
+                                day.date.toDateString() &&
+                              parseInt(job.start_time.split(":")[0], 10) ===
+                                hour
+                          )
+                          .map((job) => {
+                            const clinic = clinics.find(
+                              (c) => c.id === job.clinic_id
+                            );
+                            return (
+                              <div
+                                key={job.id}
+                                className={cn(
+                                  "mb-1 px-2 py-1 rounded text-xs font-medium flex items-center",
+                                  getJobColor(job.status)
+                                )}
+                              >
+                                <span className="truncate">
+                                  {clinic?.clinic_name ||
+                                    job.clinic_name ||
+                                    "Clinic"}
+                                </span>
+                                <span className="ml-2">
+                                  {job.start_time} - {job.end_time}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </div>
+                    ))}
                   </React.Fragment>
                 ))}
-                
               </div>
             </>
           ) : viewMode === "day" ? (
@@ -237,18 +341,58 @@ export default function CalendarPage() {
               <div className="grid grid-cols-[80px_1fr] border-t border-l text-sm">
                 <div className="border-r border-b p-2 bg-purple-50"></div>
                 {today && (
-                  <div className={cn("border-b p-2 text-center bg-purple-50 font-semibold", isSameDay(today, new Date()) && "bg-purple-300")}>
-                    {days[today.getDay()]} {today.getDate()} 
+                  <div
+                    className={cn(
+                      "border-b p-2 text-center bg-purple-50 font-semibold",
+                      isSameDay(today, new Date()) && "bg-purple-300"
+                    )}
+                  >
+                    {days[today.getDay()]} {today.getDate()}
                   </div>
                 )}
 
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-purple-50 text-gray-500">
-                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
+                      {hour === 0
+                        ? "12AM"
+                        : hour < 12
+                        ? `${hour}AM`
+                        : hour === 12
+                        ? "12PM"
+                        : `${hour - 12}PM`}
                     </div>
                     <div className="border-r border-b h-25 hover:bg-purple-50 relative">
-                    
+                      {confirmedJobs
+                        .filter(
+                          (job) =>
+                            new Date(job.date).toDateString() ===
+                              today.toDateString() &&
+                            parseInt(job.start_time.split(":")[0], 10) === hour
+                        )
+                        .map((job) => {
+                          const clinic = clinics.find(
+                            (c) => c.id === job.clinic_id
+                          );
+                          return (
+                            <div
+                              key={job.id}
+                              className={cn(
+                                "mb-1 px-2 py-1 rounded text-xs font-medium flex items-center",
+                                getJobColor(job.status)
+                              )}
+                            >
+                              <span className="truncate">
+                                {clinic?.clinic_name ||
+                                  job.clinic_name ||
+                                  "Clinic"}
+                              </span>
+                              <span className="ml-2">
+                                {job.start_time} - {job.end_time}
+                              </span>
+                            </div>
+                          );
+                        })}
                     </div>
                   </React.Fragment>
                 ))}
@@ -269,14 +413,8 @@ export default function CalendarPage() {
             <div className="w-3 h-3 rounded-full bg-green-100 border border-green-400 mr-2"></div>
             <span className="text-sm">Completed</span>
           </div>
-          <div className="flex items-center">
-            <div className="w-3 h-3 rounded-full bg-indigo-100 border border-indigo-400 mr-2"></div>
-            <span className="text-sm">Cancelled</span>
-          </div>
         </div>
       </div>
     </div>
   );
 }
-
-

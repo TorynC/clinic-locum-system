@@ -10,16 +10,24 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import Link from "next/link";
-import { Calendar, ClipboardList, Users, Clock, Trash2, BarChart3, TrendingUp, Plus, ArrowRight } from "lucide-react";
+import {
+  Calendar,
+  ClipboardList,
+  Users,
+  Clock,
+  Trash2,
+  BarChart3,
+  TrendingUp,
+  Plus,
+  ArrowRight,
+} from "lucide-react";
 import axiosInstance from "@/utils/axiosinstance";
 import { useState } from "react";
 import { useEffect } from "react";
-import { Badge } from "@/components/ui/badge"
+import { Badge } from "@/components/ui/badge";
 import { link } from "fs";
 
-
 export default function ClinicHomePage() {
-
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [clinicName, setClinicName] = useState("");
@@ -40,47 +48,48 @@ export default function ClinicHomePage() {
     }
   };
 
-  // get all job applications specific to this clinic 
+  // get all job applications specific to this clinic
   const getApplications = async () => {
-    try{
-      const response = await axiosInstance.get(`/clinic-applications/${clinicId}`);
+    try {
+      const response = await axiosInstance.get(
+        `/clinic-applications/${clinicId}`
+      );
       if (!response.data.error) {
         setApplications(response.data.applications);
-        console.log("applications retrieved")
+        console.log("applications retrieved");
       }
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
-  // function to delete job 
+  // function to delete job
   const deleteJob = async (id: string) => {
     try {
       const response = await axiosInstance.delete(`/delete-job/${id}`);
       if (!response.data.error) {
-        console.log("Job deleted successfully!")
+        console.log("Job deleted successfully!");
         getJobs();
-      }
-    } catch (error) {
-      console.error(error)
-    }
-  }
-
-  // function to get all doctors 
-  const getDoctors = async() => {
-    try { 
-      const response = await axiosInstance.get('/get-doctors');
-      if (!response.data.error) {
-        console.log("Doctors retrieved successfully");
-        setDoctors(response.data.doctors);
-        
       }
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
-  //function to get all doctor profiles 
+  // function to get all doctors
+  const getDoctors = async () => {
+    try {
+      const response = await axiosInstance.get("/get-doctors");
+      if (!response.data.error) {
+        console.log("Doctors retrieved successfully");
+        setDoctors(response.data.doctors);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  //function to get all doctor profiles
   const getDoctorProfiles = async () => {
     try {
       const response = await axiosInstance.get("/get-all-doctor-profile");
@@ -91,7 +100,7 @@ export default function ClinicHomePage() {
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
   //function to get clinic name
   const getClinicName = async () => {
@@ -121,48 +130,90 @@ export default function ClinicHomePage() {
       getDoctorProfiles();
     }
   }, [clinicId]);
-  
+
+  // Calculate metrics
+  const activeJobs = jobs.filter(
+    (job) => job.status === "posted" || job.status === "Accepted"
+  ).length;
+  const totalApplications = applications.length;
+
+  // Upcoming shifts in next 7 days
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const sevenDaysLater = new Date(today);
+  sevenDaysLater.setDate(today.getDate() + 7);
+
+  const upcomingShifts = jobs.filter((job) => {
+    const shiftDate = new Date(job.date);
+    shiftDate.setHours(0, 0, 0, 0);
+    return (
+      shiftDate >= today &&
+      shiftDate <= sevenDaysLater &&
+      job.status === "Accepted"
+    );
+  }).length;
+
+  // Total hours booked this month
+  const now = new Date();
+  const currentMonth = now.getMonth();
+  const currentYear = now.getFullYear();
+  const hoursBooked = jobs
+    .filter((job) => {
+      const jobDate = new Date(job.date);
+      return (
+        (job.status === "Accepted" || job.status === "Completed") &&
+        jobDate.getMonth() === currentMonth &&
+        jobDate.getFullYear() === currentYear
+      );
+    })
+    .reduce((sum, job) => sum + (job.duration || 0), 0);
 
   return (
     <div className="space-y-6 sm:space-y-8 animate-fade-in pb-20 md:pb-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between space-y-4 md:space-y-0">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Welcome back{clinicName ? `, ${clinicName}` : ""}</h1>
-          <p className="text-slate-600 mt-1">Here's what's happening with your locum bookings today</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+            Welcome back{clinicName ? `, ${clinicName}` : ""}
+          </h1>
+          <p className="text-slate-600 mt-1">
+            Here's what's happening with your locum bookings today
+          </p>
         </div>
         <Button
           asChild
           className="bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl shadow-soft hover:shadow-medium transition-all duration-200 transform hover:-translate-y-0.5 w-full sm:w-auto"
         >
-          <Link href="/clinic/post-job" className="flex items-center justify-center">
+          <Link
+            href="/clinic/post-job"
+            className="flex items-center justify-center"
+          >
             <Plus className="w-4 h-4 mr-2" />
             Post New Job
           </Link>
         </Button>
       </div>
 
-      {/* Metrics Grid */}
       <div className="grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           icon={<BarChart3 className="w-5 sm:w-6 h-5 sm:h-6 text-white" />}
           title="Active Jobs"
-          value="12"
-          change="+3 from last week"
-          changeType="positive"
+          value={activeJobs.toString()}
+          change=""
+          changeType="neutral"
           color="blue"
         />
         <MetricCard
           icon={<Users className="w-5 sm:w-6 h-5 sm:h-6 text-white-600" />}
           title="Applications"
-          value="28"
-          change="+12 from last week"
-          changeType="positive"
+          value={totalApplications.toString()}
+          change=""
+          changeType="neutral"
           color="emerald"
         />
         <MetricCard
           icon={<Calendar className="w-5 sm:w-6 h-5 sm:h-6 text-white-600" />}
           title="Upcoming Shifts"
-          value="8"
+          value={upcomingShifts.toString()}
           change="Next 7 days"
           changeType="neutral"
           color="orange"
@@ -170,7 +221,7 @@ export default function ClinicHomePage() {
         <MetricCard
           icon={<Clock className="w-5 sm:w-6 h-5 sm:h-6 text-white-600" />}
           title="Hours Booked"
-          value="156"
+          value={hoursBooked.toFixed(2).toString()}
           change="This month"
           changeType="neutral"
           color="rose"
@@ -185,8 +236,12 @@ export default function ClinicHomePage() {
             <CardHeader className="pb-2 sm:pb-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-slate-900">Upcoming Shifts</CardTitle>
-                  <CardDescription>Your schedule for the next 7 days</CardDescription>
+                  <CardTitle className="text-slate-900">
+                    Upcoming Shifts
+                  </CardTitle>
+                  <CardDescription>
+                    Your schedule for the next 7 days
+                  </CardDescription>
                 </div>
                 <Button
                   variant="outline"
@@ -199,60 +254,88 @@ export default function ClinicHomePage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
-              {[
-                {
-                  date: "Today",
-                  time: "9:00 AM - 5:00 PM",
-                  doctor: "Dr. Siti Aminah",
-                  type: "General Practice",
-                  status: "confirmed",
-                },
-                {
-                  date: "Tomorrow",
-                  time: "10:00 AM - 6:00 PM",
-                  doctor: "Dr. Ahmad Rahman",
-                  type: "Pediatrics",
-                  status: "confirmed",
-                },
-                {
-                  date: "May 15",
-                  time: "8:00 AM - 4:00 PM",
-                  doctor: "Pending Applications",
-                  type: "Dental",
-                  status: "pending",
-                },
-              ].map((shift, i) => (
-                <div
-                  key={i}
-                  className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group"
-                >
-                  <div
-                    className={`w-3 h-3 rounded-full mr-3 sm:mr-4 ${
-                      shift.status === "confirmed" ? "bg-emerald-500" : "bg-orange-500"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
-                        {shift.date} • {shift.time}
-                      </p>
-                      <Badge
-                        className={
-                          shift.status === "confirmed"
-                            ? "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 ml-2 flex-shrink-0"
-                            : "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200 ml-2 flex-shrink-0"
-                        }
-                      >
-                        {shift.status === "confirmed" ? "Confirmed" : "Pending"}
-                      </Badge>
+              {jobs
+                .filter((shift) => {
+                  const shiftDateObj = new Date(shift.date);
+                  shiftDateObj.setHours(0, 0, 0, 0);
+                  return (
+                    shift.doctor_id &&
+                    shift.status === "Accepted" &&
+                    shiftDateObj >= today
+                  );
+                })
+                .sort(
+                  (a, b) =>
+                    new Date(a.date).getTime() - new Date(b.date).getTime()
+                )
+                .slice(0, 3)
+                .map((shift, i) => {
+                  const doctorObj = doctors.find(
+                    (d) => d.id === shift.doctor_id
+                  );
+                  const doctorProfile = doctorProfiles.find(
+                    (d) => d.id === shift.doctor_id
+                  );
+
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+
+                  const shiftDateObj = new Date(shift.date);
+                  shiftDateObj.setHours(0, 0, 0, 0);
+
+                  const tomorrow = new Date();
+                  tomorrow.setDate(today.getDate() + 1);
+                  tomorrow.setHours(0, 0, 0, 0);
+
+                  return shift.doctor_id && shiftDateObj >= today ? (
+                    <div
+                      key={i}
+                      className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group"
+                    >
+                      <div
+                        className={`w-3 h-3 rounded-full mr-3 sm:mr-4 ${
+                          shift.status === "Accepted"
+                            ? "bg-emerald-500"
+                            : "bg-red-500"
+                        }`}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
+                            {shiftDateObj.getTime() === today.getTime()
+                              ? "Today"
+                              : shiftDateObj.getTime() === tomorrow.getTime()
+                              ? "Tomorrow"
+                              : shiftDateObj.toLocaleDateString("en-MY", {
+                                  day: "2-digit",
+                                  month: "long",
+                                  timeZone: "Asia/Kuala_Lumpur",
+                                })}{" "}
+                            • {shift.start_time.split(":")[0]}:
+                            {shift.start_time.split(":")[1]} -{" "}
+                            {shift.end_time.split(":")[0]}:
+                            {shift.end_time.split(":")[1]}
+                          </p>
+                          <Badge
+                            className={
+                              shift.status === "Accepted"
+                                ? "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 border border-emerald-200 ml-2 flex-shrink-0"
+                                : "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200 ml-2 flex-shrink-0"
+                            }
+                          >
+                            {shift.status === "Accepted"
+                              ? "Confirmed"
+                              : "Cancelled"}
+                          </Badge>
+                        </div>
+                        <p className="text-slate-600 mt-1 text-sm truncate">
+                          {doctorObj?.name} • {doctorProfile?.specialization}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors ml-2 flex-shrink-0" />
                     </div>
-                    <p className="text-slate-600 mt-1 text-sm truncate">
-                      {shift.doctor} • {shift.type}
-                    </p>
-                  </div>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors ml-2 flex-shrink-0" />
-                </div>
-              ))}
+                  ) : null;
+                })}
               <Button
                 variant="outline"
                 className="w-full bg-white text-slate-700 font-medium px-6 py-2.5 rounded-xl border border-slate-200 shadow-soft hover:shadow-medium transition-all duration-200 sm:hidden mt-2"
@@ -265,47 +348,56 @@ export default function ClinicHomePage() {
         </div>
 
         <div>
-
           <Card className="border-0 shadow-medium">
             <CardHeader className="pb-2 sm:pb-4">
-              <CardTitle className="text-slate-900">Recent Applications</CardTitle>
+              <CardTitle className="text-slate-900">
+                Recent Applications
+              </CardTitle>
               <CardDescription>Doctors who applied recently</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6">
-              {applications.slice(0,3).map((doctor, i) => {
-                const doctorObj = doctors.find(d => d.id === doctor.doctor_id);
-                const doctorProfileObj = doctorProfiles.find(d => d.id === doctor.doctor_id);
+              {applications.slice(0, 3).map((doctor, i) => {
+                const doctorObj = doctors.find(
+                  (d) => d.id === doctor.doctor_id
+                );
+                const doctorProfileObj = doctorProfiles.find(
+                  (d) => d.id === doctor.doctor_id
+                );
                 return (
-                <div
-                  key={i}
-                  className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group"
-                >
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-100 text-blue-600 mr-3 sm:mr-4 flex items-center justify-center font-semibold flex-shrink-0">
-                    {(doctor.doctor_name || "")
-                      .split(" ")
-                      .map((n: string) => n[0])
-                      .join("")}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">{doctorObj?.name || ""}</p>
-                      <div className="flex items-center text-orange-500 ml-2 flex-shrink-0">
-                        <span className="text-sm font-medium">rating</span>
-                        <span className="text-xs ml-1">★</span>
-                      </div>
+                  <div
+                    key={i}
+                    className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group"
+                  >
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-blue-100 text-blue-600 mr-3 sm:mr-4 flex items-center justify-center font-semibold flex-shrink-0">
+                      {(doctor.doctor_name || "")
+                        .split(" ")
+                        .map((n: string) => n[0])
+                        .join("")}
                     </div>
-                    <p className="text-slate-600 text-xs sm:text-sm truncate">
-                      {doctorProfileObj?.specialization || "No Specialization"} • {`${doctorProfileObj?.experience_years || "0"} Years`}
-                    </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
+                          {doctorObj?.name || ""}
+                        </p>
+                        <div className="flex items-center text-orange-500 ml-2 flex-shrink-0">
+                          <span className="text-sm font-medium">
+                            {doctorProfileObj?.reliability_rating}
+                          </span>
+                          <span className="text-xs ml-1">★</span>
+                        </div>
+                      </div>
+                      <p className="text-slate-600 text-xs sm:text-sm truncate">
+                        {doctorProfileObj?.specialization ||
+                          "No Specialization"}{" "}
+                        • {`${doctorProfileObj?.experience_years || "0"} Years`}
+                      </p>
+                    </div>
                   </div>
-                  
-                </div>
-                )
+                );
               })}
               <Button
                 variant="outline"
                 className="w-full bg-white text-slate-700 font-medium px-6 py-2.5 rounded-xl border border-slate-200 shadow-soft hover:shadow-medium transition-all duration-200"
-                
               >
                 <Link href={"/clinic/applications"}>View All Applications</Link>
               </Button>
@@ -323,8 +415,12 @@ export default function ClinicHomePage() {
                 <Plus className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Post a Job</h3>
-                <p className="text-slate-600 text-xs sm:text-sm">Create a new locum position</p>
+                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
+                  Post a Job
+                </h3>
+                <p className="text-slate-600 text-xs sm:text-sm">
+                  Create a new locum position
+                </p>
               </div>
             </div>
           </CardContent>
@@ -337,8 +433,12 @@ export default function ClinicHomePage() {
                 <Users className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">Browse Doctors</h3>
-                <p className="text-slate-600 text-xs sm:text-sm">Find preferred doctors</p>
+                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
+                  Browse Doctors
+                </h3>
+                <p className="text-slate-600 text-xs sm:text-sm">
+                  Find preferred doctors
+                </p>
               </div>
             </div>
           </CardContent>
@@ -351,8 +451,12 @@ export default function ClinicHomePage() {
                 <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">View Analytics</h3>
-                <p className="text-slate-600 text-xs sm:text-sm">Track your performance</p>
+                <h3 className="font-semibold text-slate-900 text-sm sm:text-base">
+                  View Analytics
+                </h3>
+                <p className="text-slate-600 text-xs sm:text-sm">
+                  Track your performance
+                </p>
               </div>
             </div>
           </CardContent>
@@ -360,38 +464,51 @@ export default function ClinicHomePage() {
       </div>
       <Card className="border-purple-100">
         <CardHeader className="pb-2">
-          <CardTitle className="text-purple-900">All Upcoming Jobs</CardTitle>
+          <CardTitle className="text-black-900">Jobs</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {jobs
               .slice()
-              .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+              .sort(
+                (a, b) =>
+                  new Date(a.date).getTime() - new Date(b.date).getTime()
+              )
               .map((job) => {
-                const assignedDoctor = doctors.find(d => d.id === job.doctor_id)
+                const assignedDoctor = doctors.find(
+                  (d) => d.id === job.doctor_id
+                );
                 return (
-                <div
-                  key={job.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-purple-100 rounded-xl bg-white hover:bg-purple-50 transition-colors"
-                >
-                  <div className="flex items-center gap-4  min-w-0">
-                    <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
-                      {job.title.charAt(0)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-slate-900 text-base truncate">{job.title}</span>
-                        <Badge
-                          className={
-                            job.status === "Accepted"
-                              ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-xs"
-                              : "bg-orange-100 text-orange-700 border-orange-200 text-xs"
-                          }
-                        >
-                          {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-                        </Badge>
-                        
-                        <div className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-purple-200">
+                  <div
+                    key={job.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 border border-purple-100 rounded-xl bg-white hover:bg-purple-50 transition-colors"
+                  >
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 rounded-xl bg-purple-100 text-purple-600 flex items-center justify-center font-bold text-xl flex-shrink-0">
+                        {job.procedure && job.procedure.length > 0 ? (
+                          job.procedure[0][0]
+                        ) : (
+                          <ClipboardList className="w-6 h-6" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-slate-900 text-base truncate">
+                            {`Job ID: ${job.id}`}
+                          </span>
+                          <Badge
+                            className={
+                              job.status === "Accepted"
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200 text-xs"
+                                : "bg-orange-100 text-orange-700 border-orange-200 text-xs"
+                            }
+                          >
+                            {job.status.charAt(0).toUpperCase() +
+                              job.status.slice(1)}
+                          </Badge>
+                        </div>
+                        {/* Skills/procedures as bubbles */}
+                        <div className="flex flex-nowrap gap-2 overflow-x-auto scrollbar-thin scrollbar-thumb-purple-200 mb-1">
                           {job.procedure?.map((skill: string, id: number) => (
                             <Badge
                               className="bg-purple-100 text-purple-700 border-purple-200 text-xs flex items-center whitespace-nowrap"
@@ -401,50 +518,53 @@ export default function ClinicHomePage() {
                             </Badge>
                           ))}
                         </div>
-                      
-                      </div>
-                      <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-1">
-                        <span>
-                          <Calendar className="inline w-4 h-4 mr-1" />
-                          {new Date(job.date).toLocaleDateString("en-MY", {
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric",
-                            timeZone: "Asia/Kuala_Lumpur",
-                          })}
-                        </span>
-                        <span>
-                          <Clock className="inline w-4 h-4 mr-1" />
-                          {job.start_time} - {job.end_time}
-                        </span>
-                        <span>
-                          <span className="font-medium">Pay:</span> RM{job.total_pay}
-                        </span>
-                        <span>
-                          <span className="font-medium">Job ID:</span> {job.id}
-                        </span>
-                        {assignedDoctor && <span>
-                          <span className="font-medium">Assigned Doctor: </span> {assignedDoctor.name}
-                        </span>}
+                        {/* Details row */}
+                        <div className="text-sm text-gray-500 mt-1 flex flex-wrap gap-x-2 gap-y-1">
+                          <span>
+                            <Calendar className="inline w-4 h-4 mr-1" />
+                            {new Date(job.date).toLocaleDateString("en-MY", {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric",
+                              timeZone: "Asia/Kuala_Lumpur",
+                            })}
+                          </span>
+                          <span>
+                            <Clock className="inline w-4 h-4 mr-1" />
+                            {job.start_time} - {job.end_time}
+                          </span>
+                          <span>
+                            <span className="font-medium">Pay:</span> RM
+                            {job.total_pay}
+                          </span>
+
+                          {assignedDoctor && (
+                            <span>
+                              <span className="font-medium">
+                                Assigned Doctor:{" "}
+                              </span>{" "}
+                              {assignedDoctor.name}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <button
+                      className="rounded-full bg-purple-50 hover:bg-purple-200 p-2 transition-colors border-none outline-none"
+                      onClick={() => deleteJob(job.id)}
+                      aria-label="Delete job"
+                      type="button"
+                    >
+                      <Trash2 className="h-5 w-5 text-purple-500" />
+                    </button>
                   </div>
-                  <button
-                    className="rounded-full bg-purple-50 hover:bg-purple-200 p-2 transition-colors border-none outline-none"
-                    onClick={() => deleteJob(job.id)}
-                    aria-label="Delete job"
-                    type="button"
-                  >
-                    <Trash2 className="h-5 w-5 text-purple-500" />
-                  </button>
-                </div>
-                )
+                );
               })}
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }
 
 function MetricCard({
@@ -455,36 +575,42 @@ function MetricCard({
   changeType,
   color,
 }: {
-  icon: React.ReactNode
-  title: string
-  value: string
-  change: string
-  changeType: "positive" | "negative" | "neutral"
-  color: "blue" | "emerald" | "orange" | "rose"
+  icon: React.ReactNode;
+  title: string;
+  value: string;
+  change: string;
+  changeType: "positive" | "negative" | "neutral";
+  color: "blue" | "emerald" | "orange" | "rose";
 }) {
   const colorClasses = {
     blue: "from-blue-500 to-blue-600",
     emerald: "from-emerald-500 to-emerald-600",
     orange: "from-orange-500 to-orange-600",
     rose: "from-rose-500 to-rose-600",
-  }
+  };
 
   return (
     <Card className="border-0 shadow-medium hover:shadow-strong transition-all duration-200 group">
       <CardContent className="p-3 sm:p-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs sm:text-sm font-medium text-slate-600">{title}</p>
-            <p className="text-xl sm:text-3xl font-bold text-slate-900 mt-1 sm:mt-2">{value}</p>
+            <p className="text-xs sm:text-sm font-medium text-slate-600">
+              {title}
+            </p>
+            <p className="text-xl sm:text-3xl font-bold text-slate-900 mt-1 sm:mt-2">
+              {value}
+            </p>
             <div className="flex items-center mt-1 sm:mt-2">
-              {changeType === "positive" && <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600 mr-1" />}
+              {changeType === "positive" && (
+                <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-emerald-600 mr-1" />
+              )}
               <p
                 className={`text-xs sm:text-sm ${
                   changeType === "positive"
                     ? "text-emerald-600"
                     : changeType === "negative"
-                      ? "text-rose-600"
-                      : "text-slate-500"
+                    ? "text-rose-600"
+                    : "text-slate-500"
                 }`}
               >
                 {change}
@@ -499,5 +625,5 @@ function MetricCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

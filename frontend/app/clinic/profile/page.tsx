@@ -15,14 +15,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import { Clock } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
 
 export default function ProfilePage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [clinicName, setClinicName] = useState("");
   const [clinicDescription, setClinicDescription] = useState("");
   const [clinicType, setClinicType] = useState("");
-  const [clinicYear, setClinicYear] = useState("");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAddress, setClinicAddress] = useState("");
   const [clinicCity, setClinicCity] = useState("");
@@ -32,16 +30,12 @@ export default function ProfilePage() {
   const [qualifications, setQualifications] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
   const [preferredDoctors, setPreferredDoctors] = useState<boolean>(false);
-  const [dayRate, setDayRate] = useState<number>(0);
-  const [nightRate, setNightRate] = useState<number>(0);
-  const [dayStart, setDayStart] = useState<string>("09:00");
-  const [dayEnd, setDayEnd] = useState<string>("17:00");
-  const [nightStart, setNightStart] = useState<string>("17:00");
-  const [nightEnd, setNightEnd] = useState<string>("21:00");
-  const [twoRates, setTwoRates] = useState(false);
   const [rate, setRate] = useState<number>(0);
   const [start, setStart] = useState<string>("09:00");
   const [end, setEnd] = useState<string>("18:00");
+  const [state, setState] = useState("");
+  const [doctor, setDoctor] = useState("");
+  const [gender, setGender] = useState("");
 
   // function to save changes
   const handleSaveGeneral = async () => {
@@ -50,7 +44,6 @@ export default function ProfilePage() {
       await axiosInstance.patch(`/general-info/${clinicId}`, {
         type: clinicType,
         description: clinicDescription,
-        year: clinicYear,
       });
     } catch (error) {
       console.error(error);
@@ -61,28 +54,18 @@ export default function ProfilePage() {
   const handleSavePreferences = async () => {
     try {
       const response = await axiosInstance.patch(`/preferences/${clinicId}`, {
-        dayRate,
-        nightRate,
-        dayStart,
-        dayEnd,
-        nightStart,
-        nightEnd,
         qualifications,
         languages,
-        preferredDoctors, 
-        twoRates,
+        preferredDoctors,
         rate,
         start,
-        end
+        end,
+        gender, 
       });
 
-      // Update local state with the response data if needed
       console.log("Preferences saved successfully:", response.data);
-
-      // Optional: Show success message to user
     } catch (error) {
       console.error("Error saving preferences:", error);
-      // Optional: Show error message to user
     }
   };
   // function to save name
@@ -115,9 +98,11 @@ export default function ProfilePage() {
       await axiosInstance.patch(`/contact-details/${clinicId}`, {
         address: clinicAddress,
         city: clinicCity,
+        state, // <-- add this
         postal: clinicPostal,
         phone: clinicPhone,
         website: clinicWebsite,
+        doctor, // <-- add this
       });
     } catch (error) {
       console.error(error);
@@ -129,19 +114,13 @@ export default function ProfilePage() {
     try {
       const response = await axiosInstance.get(`/get-preferences/${clinicId}`);
       if (!response.data.error) {
-        setDayRate(response.data.clinic.day_rate);
-        setNightRate(response.data.clinic.night_rate);
         setQualifications(response.data.clinic.qualifications || []);
         setLanguages(response.data.clinic.languages || []);
         setPreferredDoctors(response.data.clinic.preferred_doctors_only);
-        setDayStart(response.data.clinic.day_start_time);
-        setDayEnd(response.data.clinic.day_end_time);
-        setNightStart(response.data.clinic.night_start_time);
-        setNightEnd(response.data.clinic.night_end_time);
         setRate(response.data.clinic.default_rate);
-        setTwoRates(response.data.clinic.two_rates);
         setStart(response.data.clinic.start_time);
         setEnd(response.data.clinic.end_time);
+        setGender(response.data.clinic.gender)
       }
     } catch (error) {
       console.error(error);
@@ -169,7 +148,6 @@ export default function ProfilePage() {
       );
       if (!response.data.error) {
         setClinicDescription(response.data.clinic.description);
-        setClinicYear(response.data.clinic.year);
         setClinicType(response.data.clinic.type);
       }
     } catch (error) {
@@ -190,6 +168,8 @@ export default function ProfilePage() {
         setClinicPostal(response.data.clinic.postal);
         setClinicPhone(response.data.clinic.phone);
         setClinicWebsite(response.data.clinic.website);
+        setState(response.data.clinic.state || ""); // <-- add this
+        setDoctor(response.data.clinic.doctor || ""); // <-- add this
       }
     } catch (error) {
       console.error("Error fetching contact info:", error);
@@ -215,23 +195,23 @@ export default function ProfilePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-purple-900">Clinic Profile</h1>
+        <h1 className="text-3xl font-bold text-black">Clinic Profile</h1>
         <p className="text-gray-500">
           Manage your clinic information and settings
         </p>
       </div>
 
       <Tabs defaultValue="general">
-        <TabsList className="grid w-full grid-cols-3 max-w-md bg-purple-100 text-purple-600">
+        <TabsList className="grid w-full grid-cols-3 max-w-md bg-blue-100 text-blue-600">
           <TabsTrigger value="general">General Info</TabsTrigger>
           <TabsTrigger value="contact">Contact Details</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
         <TabsContent value="general" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">
+              <CardTitle className="text-black">
                 General Information
               </CardTitle>
               <CardDescription>
@@ -279,20 +259,8 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="established">Year Established</Label>
-                <Input
-                  id="established"
-                  type="number"
-                  value={clinicYear ? `${clinicYear}` : ""}
-                  onChange={(e) => {
-                    setClinicYear(e.target.value);
-                  }}
-                />
-              </div>
-
               <Button
-                className="bg-purple-gradient hover:bg-purple-700"
+                className="bg-blue-700 hover:bg-blue-900"
                 onClick={() => {
                   handleSaveGeneral();
                   handleSaveName();
@@ -307,7 +275,7 @@ export default function ProfilePage() {
         <TabsContent value="contact" className="mt-6">
           <Card className="border-purple-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">Contact Details</CardTitle>
+              <CardTitle className="text-black-900">Contact Details</CardTitle>
               <CardDescription>
                 Update your clinic's contact information
               </CardDescription>
@@ -324,7 +292,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="city">City</Label>
                   <Input
@@ -332,6 +300,18 @@ export default function ProfilePage() {
                     value={clinicCity ? `${clinicCity}` : ""}
                     onChange={(e) => {
                       setClinicCity(e.target.value);
+                    }}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    className="w-full"
+                    value={state}
+                    onChange={(e) => {
+                      setState(e.target.value);
                     }}
                   />
                 </div>
@@ -343,8 +323,20 @@ export default function ProfilePage() {
                     onChange={(e) => {
                       setClinicPostal(e.target.value);
                     }}
+                    className="w-full"
                   />
                 </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="doctor">Person In Charge (PIC) Name</Label>
+                <Input
+                  id="doctor"
+                  value={doctor}
+                  onChange={(e) => {
+                    setDoctor(e.target.value);
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
@@ -378,7 +370,7 @@ export default function ProfilePage() {
               </div>
 
               <Button
-                className="bg-purple-gradient hover:bg-purple-700"
+                className="bg-blue-700 hover:bg-blue-900"
                 onClick={() => {
                   handleSaveContact();
                   handleSaveEmail();
@@ -391,168 +383,56 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="preferences" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">Preferences</CardTitle>
+              <CardTitle className="text-black">Preferences</CardTitle>
               <CardDescription>
                 Set your default preferences for job postings
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 ">
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="two-rates"
-                  checked={twoRates}
-                  onCheckedChange={setTwoRates}
-                ></Switch>
-                <Label htmlFor="two-rates">
-                  Enable Day Time and Night Time rates
-                </Label>
+              <div className="space-y-2">
+                <Label htmlFor="default-rate">Default Rate (MYR)</Label>
+                <Input
+                  id="default-rate"
+                  type="number"
+                  value={Number(rate)}
+                  onChange={(e) => {
+                    setRate(Number(e.target.value));
+                  }}
+                />
               </div>
-              {twoRates && (
+
+              <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  {twoRates && (
-                    <Label htmlFor="default-day-rate">
-                      Default Day Time Rate (MYR)
-                    </Label>
-                  )}
-                  {twoRates && (
+                  <Label htmlFor="start-time">Default Shift Start Time</Label>
+                  <div className="relative">
                     <Input
-                      id="default-day-rate"
-                      type="number"
-                      value={Number(dayRate)}
-                      onChange={(e) => setDayRate(Number(e.target.value))}
+                      id="start-time"
+                      type="time"
+                      value={start}
+                      onChange={(e) => {
+                        setStart(e.target.value);
+                      }}
                     />
-                  )}
+                    <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
+                  </div>
                 </div>
-              )}
-
-              {!twoRates && (
                 <div className="space-y-2">
-                  <Label htmlFor="default-rate">Default Rate (MYR)</Label>
-                  <Input
-                    id="default-rate"
-                    type="number"
-                    value={Number(rate)}
-                    onChange={(e) => {
-                      setRate(Number(e.target.value));
-                    }}
-                  />
-                </div>
-              )}
-
-              {!twoRates && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-time">Default Shift Start Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="start-time"
-                        type="time"
-                        value={start}
-                        onChange={(e) => {
-                          setStart(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-time">Default Shift End Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="end-time"
-                        type="time"
-                        value={end}
-                        onChange={(e) => {
-                          setEnd(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
+                  <Label htmlFor="end-time">Default Shift End Time</Label>
+                  <div className="relative">
+                    <Input
+                      id="end-time"
+                      type="time"
+                      value={end}
+                      onChange={(e) => {
+                        setEnd(e.target.value);
+                      }}
+                    />
+                    <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                   </div>
                 </div>
-              )}
-
-              {twoRates && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-time">Day Start Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="start-time"
-                        type="time"
-                        value={dayStart}
-                        onChange={(e) => {
-                          setDayStart(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-time">Day End Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="end-time"
-                        type="time"
-                        value={dayEnd}
-                        onChange={(e) => {
-                          setDayEnd(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {twoRates && (
-                <div className="space-y-2">
-                  <Label htmlFor="default-night-rate">
-                    Default Night Time Rate (MYR)
-                  </Label>
-                  <Input
-                    id="default-night-rate"
-                    type="number"
-                    value={Number(nightRate)}
-                    onChange={(e) => setNightRate(Number(e.target.value))}
-                  />
-                </div>
-              )}
-
-              {twoRates && (
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="start-time">Night Start Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="start-time"
-                        type="time"
-                        value={nightStart}
-                        onChange={(e) => {
-                          setNightStart(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="end-time">Night End Time</Label>
-                    <div className="relative">
-                      <Input
-                        id="end-time"
-                        type="time"
-                        value={nightEnd}
-                        onChange={(e) => {
-                          setNightEnd(e.target.value);
-                        }}
-                      />
-                      <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
 
               <div className="space-y-2">
                 <Label>Preferred Doctor Qualifications</Label>
@@ -592,31 +472,83 @@ export default function ProfilePage() {
               <div className="space-y-2">
                 <Label>Preferred Languages</Label>
                 <div className="grid grid-cols-2 gap-2 ">
-                  {["English", "Malay", "Mandarin", "Tamil", "Cantonese"].map(
-                    (language) => (
-                      <div
-                        key={language}
-                        className="flex items-center space-x-2 "
-                      >
-                        <input
-                          type="checkbox"
-                          id={`lang-${language}`}
-                          className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                          checked={languages.includes(language)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setLanguages([...languages, language]);
-                            } else {
-                              setLanguages(
-                                languages.filter((q) => q !== language)
-                              );
-                            }
-                          }}
-                        />
-                        <Label htmlFor={`lang-${language}`}>{language}</Label>
-                      </div>
-                    )
-                  )}
+                  {[
+                    "English",
+                    "Bahasa Malaysia",
+                    "Mandarin",
+                    "Tamil",
+                    "Cantonese",
+                  ].map((language) => (
+                    <div
+                      key={language}
+                      className="flex items-center space-x-2 "
+                    >
+                      <input
+                        type="checkbox"
+                        id={`lang-${language}`}
+                        className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                        checked={languages.includes(language)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setLanguages([...languages, language]);
+                          } else {
+                            setLanguages(
+                              languages.filter((q) => q !== language)
+                            );
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`lang-${language}`}>{language}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Preferred Gender</Label>
+                <div className="flex space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="any-gender"
+                      name="gender"
+                      className="h-4 w-4"
+                      value="any"
+                      checked={gender === "any"}
+                      onChange={() => {
+                        setGender("any");
+                      }}
+                    />
+                    <Label htmlFor="any-gender">Any</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="male"
+                      name="gender"
+                      className="h-4 w-4"
+                      value={"male"}
+                      checked={gender === "male"}
+                      onChange={() => {
+                        setGender("male");
+                      }}
+                    />
+                    <Label htmlFor="male">Male</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="female"
+                      name="gender"
+                      className="h-4 w-4"
+                      value={"female"}
+                      checked={gender === "female"}
+                      onChange={() => {
+                        setGender("female");
+                      }}
+                    />
+                    <Label htmlFor="female">Female</Label>
+                  </div>
                 </div>
               </div>
 
@@ -634,7 +566,7 @@ export default function ProfilePage() {
               </div>
 
               <Button
-                className="bg-purple-gradient hover:bg-purple-700"
+                className="bg-blue-700 hover:bg-blue-900"
                 onClick={handleSavePreferences}
               >
                 Save Preferences

@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { use, useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import {
   Card,
@@ -9,14 +9,25 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Upload } from "lucide-react";
+import { CheckCircle, Heart } from "lucide-react";
 import React from "react";
 
-export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ id: string }>}) {
-  const { id } = React.use(params);
-
+export default function ClinicDoctorProfilePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = use(params);
+  const [favoriteDoctors, setFavoriteDoctors] = useState<string[]>([]);
   const [doctor, setDoctor] = useState<any>(null);
   const [profile, setProfile] = useState<any>(null);
+  const [clinicId, setClinicId] = useState<string | null>(null);
+
+  // Get clinicId from localStorage on mount
+  useEffect(() => {
+    const storedId = localStorage.getItem("clinicId");
+    if (storedId) setClinicId(storedId);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,9 +44,59 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
     fetchData();
   }, [id]);
 
+  useEffect(() => {
+    if (!clinicId) return;
+    const fetchFavorites = async () => {
+      try {
+        const response = await axiosInstance.get(
+          `/favorite-doctors/${clinicId}`
+        );
+        if (!response.data.error) {
+          setFavoriteDoctors(response.data.favoriteDoctorIds);
+        }
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    fetchFavorites();
+  }, [clinicId]);
+
   if (!doctor || !profile) {
-    return <div className="p-8 text-center text-gray-500">Loading profile...</div>;
+    return (
+      <div className="p-8 text-center text-gray-500">Loading profile...</div>
+    );
   }
+
+  const toggleFavorite = (doctorId: string) => {
+    if (favoriteDoctors.includes(doctorId)) {
+      unheartDoctor(doctorId);
+    } else {
+      heartDoctor(doctorId);
+    }
+  };
+
+  const heartDoctor = async (doctorId: string) => {
+    try {
+      await axiosInstance.post("/favorite-doctor", {
+        clinic_id: clinicId,
+        doctor_id: doctorId,
+      });
+      setFavoriteDoctors((prev) => [...prev, doctorId]);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const unheartDoctor = async (doctorId: string) => {
+    try {
+      await axiosInstance.delete(
+        `/favorite-doctor?clinic_id=${clinicId}&doctor_id=${doctorId}`
+      );
+      setFavoriteDoctors((prev) => prev.filter((id) => id !== doctorId));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
   return (
     <div className="max-w-4xl mx-auto py-10 space-y-8">
@@ -46,12 +107,20 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
             <div className="w-32 h-32 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-4xl font-medium overflow-hidden">
               {profile.profile_pic ? (
                 <img
-                  src={`http://localhost:5000/${profile.profile_pic.replace(/\\/g, "/")}`}
+                  src={`http://localhost:5000/${profile.profile_pic.replace(
+                    /\\/g,
+                    "/"
+                  )}`}
                   alt="Profile"
                   className="w-32 h-32 object-cover rounded-full"
                 />
               ) : (
-                <span>{doctor.name?.split(" ").map((n: string) => n[0]).join("")}</span>
+                <span>
+                  {doctor.name
+                    ?.split(" ")
+                    .map((n: string) => n[0])
+                    .join("")}
+                </span>
               )}
             </div>
             {profile.verified && (
@@ -68,7 +137,10 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
                 <span className="font-semibold">MMC Certificate:</span>{" "}
                 {profile.mmc_file ? (
                   <a
-                    href={`http://localhost:5000/${profile.mmc_file.replace(/\\/g, "/")}`}
+                    href={`http://localhost:5000/${profile.mmc_file.replace(
+                      /\\/g,
+                      "/"
+                    )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-700 underline"
@@ -83,7 +155,10 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
                 <span className="font-semibold">APC Certificate:</span>{" "}
                 {profile.apc_file ? (
                   <a
-                    href={`http://localhost:5000/${profile.apc_file.replace(/\\/g, "/")}`}
+                    href={`http://localhost:5000/${profile.apc_file.replace(
+                      /\\/g,
+                      "/"
+                    )}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-purple-700 underline"
@@ -94,15 +169,59 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
                   <span className="text-gray-400">Not uploaded</span>
                 )}
               </div>
+              <div>
+                <span className="font-semibold">Bank Account Number:</span>
+                <p className=" text-gray-700 text-sm">{profile.bank_number}</p>
+              </div>
             </div>
           </div>
           {/* Doctor Info */}
           <div className="flex-1 space-y-4">
             <div>
-              <h2 className="text-2xl font-bold text-purple-900">{doctor.name}</h2>
-              <div className="text-gray-500">{profile.specialization || "No specialization"}</div>
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-bold text-black">
+                  {doctor.name}{" "}
+                </h2>
+                <button
+                  type="button"
+                  className="focus:outline-none"
+                  onClick={() => toggleFavorite(doctor?.id)}
+                  aria-label="Favorite doctor"
+                >
+                  <Heart
+                    className={
+                      favoriteDoctors.includes(doctor?.id)
+                        ? "text-red-500 fill-red-500"
+                        : "text-gray-400"
+                    }
+                    fill={
+                      favoriteDoctors.includes(doctor?.id)
+                        ? "currentColor"
+                        : "none"
+                    }
+                    size={25}
+                  />
+                </button>
+              </div>
+              <div className="text-gray-500">
+                {profile.specialization || "No specialization"}
+              </div>
               <div className="text-sm text-gray-500 mt-1">
-                {profile.experience_years != null ? `${profile.experience_years} years experience` : ""}
+                {profile.experience_years != null
+                  ? `${profile.experience_years} years experience`
+                  : ""}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm text-gray-600 font-medium">
+                  Reliability Rating:
+                </span>
+                <span className="text-lg font-semibold text-yellow-500">
+                  {profile.reliability_rating != null
+                    ? profile.reliability_rating
+                    : "5.0"}
+                </span>
+                <span className="text-2xl text-yellow-500">★</span>
+                  
               </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -121,7 +240,9 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
             </div>
             <div>
               <div className="font-medium text-slate-900">Bio</div>
-              <div className="text-sm text-gray-700">{profile.bio || "No bio provided."}</div>
+              <div className="text-sm text-gray-700">
+                {profile.bio || "No bio provided."}
+              </div>
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {profile.skills?.map((skill: string) => (
@@ -144,7 +265,9 @@ export default function ClinicDoctorProfilePage({ params }: { params: Promise<{ 
       {/* Work Experience */}
       <Card className="border-purple-100">
         <CardHeader>
-          <CardTitle className="text-purple-900">Professional Experience</CardTitle>
+          <CardTitle className="text-purple-900">
+            Professional Experience
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {profile.work_experience && profile.work_experience.length > 0 ? (

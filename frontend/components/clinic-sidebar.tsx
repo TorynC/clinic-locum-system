@@ -2,7 +2,7 @@
 
 import type React from "react"
 import Link from "next/link"
-import { Calendar, BarChart3, Home, Settings, User, Users, Plus, LogOut, Building2, Pencil, Briefcase } from "lucide-react"
+import { Calendar, BarChart3, Home, Bell, User, Users, Plus, LogOut, Building2, Pencil, Briefcase } from "lucide-react"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 
@@ -31,7 +31,7 @@ export default function ClinicSidebar() {
         <SidebarLink
           href="/clinic"
           icon={<Home className="w-5 h-5" />}
-          label="Dashboard"
+          label="Home"
           isActive={pathname === "/clinic"}
         />
         <SidebarLink
@@ -61,7 +61,7 @@ export default function ClinicSidebar() {
         <SidebarLink
           href="/clinic/dashboard"
           icon={<BarChart3 className="w-5 h-5" />}
-          label="Analytics"
+          label="Dashboard"
           isActive={pathname.startsWith("/clinic/dashboard")}
         />
         <SidebarLink
@@ -77,10 +77,10 @@ export default function ClinicSidebar() {
           isActive={pathname.startsWith("/clinic/profile")}
         />
         <SidebarLink
-          href="/clinic/settings"
-          icon={<Settings className="w-5 h-5" />}
-          label="Settings"
-          isActive={pathname.startsWith("/clinic/settings")}
+          href="/clinic/notifications"
+          icon={<Bell className="w-5 h-5" />}
+          label="Notifications"
+          isActive={pathname.startsWith("/clinic/notifications")}
         />
       </nav>
 

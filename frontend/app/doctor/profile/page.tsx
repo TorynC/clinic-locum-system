@@ -1068,7 +1068,7 @@ export default function DoctorProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>Notification Preferences</Label>
+                <Label>Notification Preferences (Available in the next update)</Label>
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
                     <Switch

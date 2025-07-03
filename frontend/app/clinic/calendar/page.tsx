@@ -18,9 +18,9 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [jobs, setJobs] = useState<any[]>([]);
   const [events, setEvents] = useState<any[]>([]);
-
+  const [doctors, setDoctors] = useState<any[]>([]);
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
+  
   // Generate calendar days (simplified for example)
   const calendarDays = getCalendarDays(currentDate);
   
@@ -33,6 +33,18 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error(error)
+    }
+  }
+
+  // get doctors 
+  const getDoctors = async () => {
+    try { 
+      const response = await axiosInstance.get(`/get-doctors`)
+      if (!response.data.error) {
+        setDoctors(response.data.doctors)
+      }
+    } catch (error) {
+      console.error(error);
     }
   }
 
@@ -127,15 +139,16 @@ export default function CalendarPage() {
   useEffect(() => {
     if (clinicId) {
       getJobs();
+      getDoctors();
     }
   }, [clinicId])
 
   useEffect(() => {
-      if (jobs.length > 0) {
+      if (jobs.length > 0 && doctors.length > 0) {
       const formattedEvents = jobs.map((job) => {
       const utcDate = new Date(job.date);
       const malaysiaDate = new Date(utcDate.getTime() + 28800000);
-      
+      const doctorObj = doctors.find(d => d.id === job.doctor_id)
       // Parse time components
       const [startH, startM, startS] = job.start_time.split(':').map(Number);
       const [endH, endM, endS] = job.end_time.split(':').map(Number);
@@ -150,20 +163,19 @@ export default function CalendarPage() {
       if (end <= start) {
         end.setDate(end.getDate() + 1)
       }
-      
       return {
-        title: job.title,
         start,
         end,
         status: job.status,
         id: job.id,
         start_time: job.start_time,
-        end_time: job.end_time
+        end_time: job.end_time,
+        doctor_name: doctorObj ? doctorObj.name :  ""
       };
     });
     setEvents(formattedEvents);
   }
-}, [jobs]);
+}, [jobs, doctors]);
 
 
   const getEventsforDayMonth = (day: Date) => {
@@ -189,7 +201,7 @@ export default function CalendarPage() {
         return "bg-purple-100 border border-purple-400 text-purple-800";
       case "Accepted":
         return "bg-green-100 border border-green-400 text-green-800";
-      case "completed":
+      case "Completed":
         return "bg-indigo-100 border border-indigo-400 text-indigo-800";
       default:
         return "bg-gray-100 border border-gray-400 text-gray-800";
@@ -199,20 +211,12 @@ export default function CalendarPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold text-purple-900">Calendar</h1>
+        <h1 className="text-3xl font-bold text-black">Calendar</h1>
         <div className="flex items-center space-x-2">
-          {/*<Button
-            variant="outline"
-            size="sm"
-            className="border-purple-200 text-purple-700"
-          >
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>*/}
           <Button
             size="sm"
             asChild
-            className="bg-purple-gradient hover:bg-purple-700"
+            className="bg-blue-700 hover:bg-blue-900"
           >
             <Link href="/clinic/post-job">
               <Plus className="h-4 w-4 mr-2" />
@@ -223,19 +227,19 @@ export default function CalendarPage() {
       </div>
 
       <Card className="border-purple-100 overflow-hidden">
-        <div className="h-1 bg-purple-gradient"></div>
+        <div className="h-1 bg-blue-700"></div>
         <CardContent className="p-6">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="icon"
-                className="border-purple-200 text-purple-700"
+                className="border-purple-200 text-blue-700"
                 onClick={viewMode === "month" ? prevMonth : viewMode === "week" ? prevWeek : yesterday}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
-              <h2 className="text-xl font-bold text-purple-900">
+              <h2 className="text-xl font-bold text-blue-900">
                 {currentMonth}
               </h2>
               <Button
@@ -296,7 +300,7 @@ export default function CalendarPage() {
                             <div key={event.id}  className={cn(
                               "text-xs truncate rounded p-0.5 flex-col z-0 ",
                               getJobColor(event.status))}>
-                              {event.title} 
+                              {event.doctor_name} 
                               <div className=" text-xs z-10">
                                 {`${event.start_time}-${event.end_time}`}
                               </div>
@@ -339,7 +343,7 @@ export default function CalendarPage() {
                             <div key={event.id}  className={cn(
                               "text-xs truncate rounded p-0.5 flex-col z-0 ",
                               getJobColor(event.status))}>
-                              {event.title} 
+                              {event.doctor_name} 
                               <div className=" text-xs z-10">
                                 {`${event.start_time}-${event.end_time}`}
                               </div>
@@ -377,7 +381,7 @@ export default function CalendarPage() {
                             <div key={event.id}  className={cn(
                               "text-xs truncate rounded p-0.5 flex-col z-0 ",
                               getJobColor(event.status))}>
-                              {event.title} 
+                              {event.doctor_name} 
                               <div className=" text-xs z-10">
                                 {`${event.start_time}-${event.end_time}`}
                               </div>

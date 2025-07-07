@@ -53,15 +53,18 @@ export default function DoctorDashboardPage() {
     }
   };
 
-  // function to get clinic contact info 
+  // function to get clinic contact info
   const getClinicContact = async (clinicId: string) => {
     const token = localStorage.getItem("doctorAccessToken");
     try {
-      const result = await axiosInstance.get(`/get-contact-details/${clinicId}`, {
-        headers: {
-          ...(token && { Authorization: `Bearer ${token}` }),
-        },
-      });
+      const result = await axiosInstance.get(
+        `/get-contact-details/${clinicId}`,
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
       if (!result.data.error) {
         setClinicContactInfo(result.data.clinic);
       }
@@ -142,17 +145,19 @@ export default function DoctorDashboardPage() {
   const indexOfFirstJob = indexOfLastJob - jobsPerPage;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">My Dashboard</h1>
-          <p className="text-gray-500">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-black">
+            My Dashboard
+          </h1>
+          <p className="text-sm sm:text-base text-gray-500">
             Track your shifts, earnings, and performance
           </p>
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4 sm:gap-4">
         <StatCard
           title="Total Hours"
           value={`${totalHours} hrs`}
@@ -175,17 +180,17 @@ export default function DoctorDashboardPage() {
         />
       </div>
 
-      <Card className="border-purple-100">
+      <Card className="border-blue-100">
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-purple-900">Shift History</CardTitle>
+            <CardTitle className="text-black">Shift History</CardTitle>
             <div className="flex items-center space-x-2"></div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-purple-100 overflow-hidden mt-4">
+          <div className="rounded-md border border-purple-100 overflow-x-auto mt-4">
             <table className="min-w-full divide-y divide-purple-100">
-              <thead className="bg-purple-50">
+              <thead className="bg-slate-100">
                 <tr>
                   <TableHeader>
                     Date <ArrowUpDown className="h-3 w-3 ml-1" />
@@ -207,41 +212,40 @@ export default function DoctorDashboardPage() {
                   )
                   .slice(indexOfFirstJob, indexOfLastJob)
                   .map((job) => {
-                    getClinicContact(job.clinic_id)
+                    getClinicContact(job.clinic_id);
                     return (
-                    <tr
-                      key={job.id}
-                      className="hover:bg-purple-50 transition-colors"
-                    >
-                      <TableCell>
-                        {new Date(job.date).toLocaleDateString("en-MY", {
-                          year: "numeric",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell>
-                        {job.start_time?.slice(0, 5)} -{" "}
-                        {job.end_time?.slice(0, 5)}
-                      </TableCell>
-                      <TableCell>{job.duration}</TableCell>
-                      <TableCell>RM {job.total_pay}</TableCell>
-                      <TableCell>
+                      <tr
+                        key={job.id}
+                        className="hover:bg-blue-100 transition-colors"
+                      >
+                        <TableCell>
+                          {new Date(job.date).toLocaleDateString("en-MY", {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric",
+                          })}
+                        </TableCell>
+                        <TableCell>
+                          {job.start_time?.slice(0, 5)} -{" "}
+                          {job.end_time?.slice(0, 5)}
+                        </TableCell>
+                        <TableCell>{job.duration}</TableCell>
+                        <TableCell>RM {job.total_pay}</TableCell>
+                        <TableCell>
                           {job.clinic_name ||
                             clinics.find((c) => c.id === job.clinic_id)
                               ?.clinic_name ||
                             "Clinic"}
-                      </TableCell>
-                      <TableCell>
-                        {clinicContactInfo?.address}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-green-100 text-green-800">
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                    </tr>)
-})}
+                        </TableCell>
+                        <TableCell>{clinicContactInfo?.address}</TableCell>
+                        <TableCell>
+                          <Badge className="bg-green-100 text-green-800">
+                            {job.status}
+                          </Badge>
+                        </TableCell>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
@@ -261,15 +265,19 @@ function StatCard({
   icon: React.ReactNode;
 }) {
   return (
-    <Card className="border-purple-100 overflow-hidden">
-      <div className="h-1 bg-purple-gradient-light"></div>
-      <CardContent className="p-6">
+    <Card className="border-blue-100 overflow-hidden w-full">
+      <div className="h-1 bg-black"></div>
+      <CardContent className="p-3 sm:p-4">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium text-gray-500">{title}</p>
-            <p className="text-3xl font-bold text-purple-900 mt-2">{value}</p>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-medium text-gray-500 truncate">
+              {title}
+            </p>
+            <p className="text-lg sm:text-xl md:text-2xl font-bold text-blue mt-1 truncate">
+              {value}
+            </p>
           </div>
-          <div className="p-2 rounded-full bg-purple-50 text-purple-600">
+          <div className="p-2 rounded-full bg-blue-50 text-blue-600 flex-shrink-0 ml-2">
             {icon}
           </div>
         </div>
@@ -280,7 +288,7 @@ function StatCard({
 
 function TableHeader({ children }: { children: React.ReactNode }) {
   return (
-    <th className="px-6 py-3 text-left text-xs font-medium text-purple-900 uppercase tracking-wider">
+    <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-blue uppercase tracking-wider">
       <div className="flex items-center">{children}</div>
     </th>
   );
@@ -288,7 +296,7 @@ function TableHeader({ children }: { children: React.ReactNode }) {
 
 function TableCell({ children }: { children: React.ReactNode }) {
   return (
-    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+    <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700">
       {children}
     </td>
   );

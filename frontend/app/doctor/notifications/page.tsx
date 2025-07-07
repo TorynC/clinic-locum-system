@@ -4,12 +4,10 @@ import React, { useEffect, useRef, useState } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import { Bell, CheckCircle, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { toast } from "sonner";
 
 const DoctorNotificationsPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const shownIds = useRef<Set<number>>(new Set());
 
   const doctorId =
     typeof window !== "undefined" ? localStorage.getItem("doctorId") : null;
@@ -40,34 +38,11 @@ const DoctorNotificationsPage = () => {
     }
   };
 
-  // Poll every 15 seconds
+
   useEffect(() => {
     if (!doctorId) return;
     getNotifications();
-    const interval = setInterval(getNotifications, 15000);
-    return () => clearInterval(interval);
-    // eslint-disable-next-line
   }, [doctorId, token]);
-
-  // Show toast for new, unread notifications
-  useEffect(() => {
-    notifications.forEach((n) => {
-      if (!n.is_read && !shownIds.current.has(n.id)) {
-        toast(n.title, {
-          description: n.message,
-          duration: 10000,
-          action: {
-            label: "Mark as read",
-            onClick: () => markAsRead(n.id),
-          },
-        });
-        shownIds.current.add(n.id);
-        // Optionally auto-mark as read after showing
-        markAsRead(n.id);
-      }
-    });
-    // eslint-disable-next-line
-  }, [notifications]);
 
   // Mark notification as read in backend
   const markAsRead = async (id: number) => {
@@ -106,7 +81,7 @@ const DoctorNotificationsPage = () => {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`p-4 rounded border flex items-start gap-3 cursor-pointer ${
+              className={`p-4 rounded border flex items-start gap-3 cursor-pointer hover:bg-blue-200 ${
                 n.is_read ? "bg-white" : "bg-purple-50 border-purple-200"
               }`}
               onClick={() => markAsRead(n.id)}
@@ -131,6 +106,14 @@ const DoctorNotificationsPage = () => {
                       New
                     </Badge>
                   )}
+                  {!n.is_read && (
+                  <Badge
+                    variant="default"
+                    className="bg-slate-700 text-white"
+                  >
+                    Mark as Read?
+                  </Badge>
+                )}
                 </div>
                 <div className="text-sm text-gray-700">{n.message}</div>
                 <div className="text-xs text-gray-400 mt-1">

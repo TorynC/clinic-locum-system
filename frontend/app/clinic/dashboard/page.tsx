@@ -1,6 +1,5 @@
 "use client";
 import type React from "react";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Search, Download, ArrowUpDown, Heart } from "lucide-react";
@@ -121,30 +120,28 @@ export default function DashboardPage() {
   const completedShifts = completedJobs.length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-black">Dashboard</h1>
-          <p className="text-gray-500">
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-black">
+            Dashboard
+          </h1>
+          <p className="text-sm sm:text-base text-gray-500">
             History of locum shifts and statistics
           </p>
         </div>
-        <Button className="bg-purple-gradient hover:bg-purple-700">
-          <Download className="h-4 w-4 mr-2" />
-          Export Report
-        </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 sm:gap-6">
         <StatCard title="Total Hours" value={`${totalHours.toFixed(1)} hrs`} />
         <StatCard title="Total Pay" value={`RM ${totalPay.toFixed(2)}`} />
         <StatCard title="Completed Shifts" value={completedShifts.toString()} />
       </div>
 
-      <Card className="border-purple-100">
+      <Card className="border-blue-100">
         <CardHeader className="pb-0">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-black-900">Shift History</CardTitle>
+            <CardTitle className="text-black">Shift History</CardTitle>
             <div className="flex items-center space-x-2">
               <div className="relative">
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
@@ -162,9 +159,9 @@ export default function DashboardPage() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border border-purple-100 overflow-hidden mt-4">
+          <div className="rounded-md border border-purple-100 overflow-x-auto mt-4">
             <table className="min-w-full divide-y divide-purple-100">
-              <thead className="bg-purple-50">
+              <thead className="bg-slate-100">
                 <tr>
                   <TableHeader>
                     Date <ArrowUpDown className="h-3 w-3 ml-1" />
@@ -172,8 +169,12 @@ export default function DashboardPage() {
                   <TableHeader>Time Slot</TableHeader>
                   <TableHeader>Hours</TableHeader>
                   <TableHeader>Pay</TableHeader>
-                  <TableHeader>Locum Doctor</TableHeader>
-                  <TableHeader>Status</TableHeader>
+                  <TableHeader>
+                    Locum Doctor
+                  </TableHeader>
+                  <TableHeader >
+                    Status
+                  </TableHeader>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-purple-100">
@@ -184,7 +185,7 @@ export default function DashboardPage() {
                   return shift.status === "Completed" ? (
                     <tr
                       key={shift.id}
-                      className="hover:bg-purple-50 transition-colors"
+                      className="hover:bg-blue-100 transition-colors"
                     >
                       <TableCell>
                         {new Date(shift.date).toLocaleDateString("en-MY", {
@@ -202,8 +203,8 @@ export default function DashboardPage() {
                       </TableCell>
                       <TableCell>{shift.duration}</TableCell>
                       <TableCell>RM {shift.total_pay}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2 ">
+                      <TableCell >
+                        <div className="flex items-center gap-2">
                           <Link
                             className="hover:underline"
                             href={`/clinic/doctors/${doctorObj?.id}`}
@@ -239,7 +240,7 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell >
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
                             shift.status === "Completed"
@@ -264,27 +265,43 @@ export default function DashboardPage() {
 
 function StatCard({ title, value }: { title: string; value: string }) {
   return (
-    <Card className="border-purple-100 overflow-hidden">
-      <div className="h-1 bg-purple-gradient-light"></div>
+    <Card className="border-blue-100 overflow-hidden">
+      <div className="h-1 bg-black"></div>
       <CardContent className="p-6">
         <h3 className="text-sm font-medium text-gray-500">{title}</h3>
-        <p className="text-3xl font-bold text-purple-900 mt-2">{value}</p>
+        <p className="text-3xl font-bold text-blue mt-2">{value}</p>
       </CardContent>
     </Card>
   );
 }
 
-function TableHeader({ children }: { children: React.ReactNode }) {
+function TableHeader({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <th className="px-6 py-3 text-left text-xs font-medium text-purple-900 uppercase tracking-wider">
+    <th
+      className={`px-3 sm:px-6 py-3 text-left text-xs font-medium text-blue uppercase tracking-wider ${className}`}
+    >
       <div className="flex items-center">{children}</div>
     </th>
   );
 }
 
-function TableCell({ children }: { children: React.ReactNode }) {
+function TableCell({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+    <td
+      className={`px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700 ${className}`}
+    >
       {children}
     </td>
   );

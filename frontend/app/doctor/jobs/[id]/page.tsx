@@ -1,5 +1,5 @@
 "use client";
-
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -40,7 +40,7 @@ export default function JobDetailsPage({
   const [job, setJob] = useState<any>();
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [clinicName, setClinicName] = useState("");
-
+  const router = useRouter();
   const getJob = async () => {
     const token = localStorage.getItem("doctorAccessToken");
     try {
@@ -461,7 +461,10 @@ export default function JobDetailsPage({
               <div className="space-y-3">
                 <Button
                   className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg"
-                  onClick={postJobApplication}
+                  onClick={() => {
+                    postJobApplication();
+                    router.push("/doctor")
+                  }}
                 >
                   Apply for This Job
                 </Button>

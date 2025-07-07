@@ -224,7 +224,10 @@ export default function PostJobPage() {
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button className="bg-blue-700 hover:bg-blue-900" onClick={postJob}>
+          <Button className="bg-blue-700 hover:bg-blue-900" onClick={() => {
+            postJob();
+            router.push("/clinic")
+          }}>
             Publish Job
           </Button>
         </div>
@@ -661,7 +664,10 @@ export default function PostJobPage() {
         </Button>
         <Button
           className="gap-2 bg-blue-700 hover:bg-blue-900"
-          onClick={postJob}
+          onClick={() => {
+            postJob();
+            router.push("/clinic")
+          }}
         >
           <Save className="h-4 w-4" />
           Publish Job

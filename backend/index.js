@@ -100,7 +100,7 @@ app.post('/api/clinic-register', async (req, res) => {
     try {
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        const accessToken = jwt.sign({ email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
 
         const result = await pool.query(
             "INSERT INTO clinics (clinic_name, email, password) VALUES ($1, $2, $3) RETURNING *",
@@ -189,7 +189,7 @@ app.post("/api/clinic-login", async (req, res) => {
             return res.status(400).json({ error: true, message: "Invalid email or password" });
         }
 
-        const accessToken = jwt.sign({ email: clinic.email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        const accessToken = jwt.sign({ email: clinic.email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
         
         res.cookie("token", accessToken, {
             httpOnly: true,
@@ -227,7 +227,7 @@ app.post("/api/doctor-register", async (req, res) => {
     try { 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const accessToken = jwt.sign({email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        const accessToken = jwt.sign({email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
 
         const result = await pool.query("INSERT INTO doctors (name, email, password) VALUES ($1, $2, $3) RETURNING *", [name, email, hashedPassword]);
 
@@ -257,7 +257,7 @@ app.post("/api/doctor-login", async (req, res) => {
             return res.status(400).json({error: true, message: "email or password does not match"});
         }
 
-        const accessToken = jwt.sign({email: doctor.email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        const accessToken = jwt.sign({email: doctor.email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
 
         return res.status(200).json({
             error: false, message: "Login successful", accessToken, email: doctor.email, id: doctor.id

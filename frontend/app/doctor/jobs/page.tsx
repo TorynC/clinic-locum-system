@@ -385,7 +385,7 @@ export default function DoctorJobsPage() {
             >
               <Card
                 className={cn(
-                  "border-0 shadow-medium hover:shadow-strong transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50/50",
+                  "rounded-3xl border-0 shadow-medium hover:shadow-strong transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50/50",
                   job.status === "Urgent" && "border-2 border-red-400"
                 )}
               >
@@ -398,9 +398,16 @@ export default function DoctorJobsPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
-                            <h3 className="font-bold text-xl text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                              {clinicNames[job.clinic_id]}
+                            <div>
+                              <h3 className="font-bold text-xl text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                              Locum Doctor 
                             </h3>
+                              <h3 className="text-lg text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                              {clinicNames[job.clinic_id]} 
+                            </h3>
+                            
+                            </div>
+                            
                             {job.status === "Urgent" && (
                               <Badge className="bg-red-100 text-red-700 border-red-200 font-semibold animate-pulse">
                                 Urgent

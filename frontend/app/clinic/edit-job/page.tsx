@@ -283,7 +283,10 @@ export default function EditJobPage() {
         </Button>
         <Button
           className="gap-2 bg-blue-700 hover:bg-blue-900"
-          onClick={editJob}
+          onClick={() => {
+            editJob();
+            router.push("/clinic");
+          }}
         >
           <Save className="h-4 w-4" />
           Save Changes

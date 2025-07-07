@@ -142,7 +142,7 @@ export default function applicationsPage() {
               <div key={job.id} className="mb-4 border rounded p-3">
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col items-start ">
-                    <div className="font-semibold text-lg">Locum Job</div>
+                    <div className="font-semibold text-lg">Locum Doctor</div>
                     <div>
                       <span className="font-semibold text-sm">{`Job ID: ${job.id}`}</span>
                       <span className="ml-2 text-slate-500 text-xs">

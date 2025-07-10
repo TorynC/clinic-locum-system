@@ -5,7 +5,31 @@
 -- Dumped from database version 17.5
 -- Dumped by pg_dump version 17.5
 
--- Started on 2025-07-10 15:08:55
+-- Started on 2025-07-10 15:32:20
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- TOC entry 5035 (class 1262 OID 16388)
+-- Name: LocumLah_DB; Type: DATABASE; Schema: -; Owner: postgres
+--
+
+CREATE DATABASE "LocumLah_DB" WITH TEMPLATE = template0 ENCODING = 'UTF8' LOCALE_PROVIDER = libc LOCALE = 'English_Malaysia.1252';
+
+
+ALTER DATABASE "LocumLah_DB" OWNER TO postgres;
+
+\connect "LocumLah_DB"
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -150,7 +174,7 @@ INSERT INTO public.notifications VALUES (26, '0360be22-7d2d-4a97-a684-46c10e58fa
 
 
 --
--- TOC entry 5039 (class 0 OID 0)
+-- TOC entry 5040 (class 0 OID 0)
 -- Dependencies: 228
 -- Name: favorite_doctors_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -159,7 +183,7 @@ SELECT pg_catalog.setval('public.favorite_doctors_id_seq', 11, true);
 
 
 --
--- TOC entry 5040 (class 0 OID 0)
+-- TOC entry 5041 (class 0 OID 0)
 -- Dependencies: 226
 -- Name: job_applications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -168,7 +192,7 @@ SELECT pg_catalog.setval('public.job_applications_id_seq', 30, true);
 
 
 --
--- TOC entry 5041 (class 0 OID 0)
+-- TOC entry 5042 (class 0 OID 0)
 -- Dependencies: 230
 -- Name: notifications_id_seq; Type: SEQUENCE SET; Schema: public; Owner: postgres
 --
@@ -176,7 +200,7 @@ SELECT pg_catalog.setval('public.job_applications_id_seq', 30, true);
 SELECT pg_catalog.setval('public.notifications_id_seq', 26, true);
 
 
--- Completed on 2025-07-10 15:08:55
+-- Completed on 2025-07-10 15:32:20
 
 --
 -- PostgreSQL database dump complete

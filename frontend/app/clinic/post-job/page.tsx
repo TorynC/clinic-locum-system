@@ -27,14 +27,12 @@ import { useEffect } from "react";
 import { formatISO } from "date-fns";
 import { useRouter } from "next/navigation";
 import axios from "axios";
-import { start } from "repl";
+import { toast } from "sonner";
 
 export default function PostJobPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [date, setDate] = useState<Date>();
   const [qualifications, setQualifications] = useState<string[]>([]);
-  const [languages, setLanguages] = useState<string[]>([]);
-  const [preferredDoctors, setPreferredDoctors] = useState(false);
   const [address, setAddress] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -48,13 +46,20 @@ export default function PostJobPage() {
   const [contactPerson, setContactPerson] = useState("");
   const [specialInstructions, setSpecialInstructions] = useState("");
   const [shiftStart, setShiftStart] = useState<string>("09:00");
-  const [shiftEnd, setShiftEnd] = useState<string>("20:00");
-
+  const [shiftEnd, setShiftEnd] = useState<string>("18:00");
+  const [hasBreak, setHasBreak] = useState(false);
   const [rate, setRate] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [shiftType, setShiftType] = useState("");
-  const [breakStart, setBreakStart] = useState("");
-  const [breakEnd, setBreakEnd] = useState("");
+  const [shiftType, setShiftType] = useState("day");
+  const [breakStart, setBreakStart] = useState<string>("12:00");
+  const [breakEnd, setBreakEnd] = useState<string>("13:00");
+  
+
+  // Night rate functionality
+  const [defaultDayRate, setDefaultDayRate] = useState<number>(0);
+  const [defaultNightRate, setDefaultNightRate] = useState<number>(0);
+  const [nightRateAvailable, setNightRateAvailable] = useState<boolean>(false);
+
   const router = useRouter();
 
   function parseTime(timeStr: string): number {
@@ -89,6 +94,16 @@ export default function PostJobPage() {
     setTotalPay(calculatedPay);
   };
 
+  // Handle shift type change to update rate automatically
+  const handleShiftTypeChange = (newShiftType: string) => {
+    setShiftType(newShiftType);
+    if (newShiftType === "day") {
+      setRate(defaultDayRate);
+    } else if (newShiftType === "night") {
+      setRate(defaultNightRate);
+    }
+  };
+
   useEffect(() => {
     updateTotalPay();
   }, [shiftStart, shiftEnd, paidBreak, breakStart, breakEnd, rate]);
@@ -106,6 +121,15 @@ export default function PostJobPage() {
     }
   };
 
+  const validateJobPost = () => {
+    if (!date || !shiftStart || !shiftEnd || !rate) {
+      toast.error("Please fill in all required fields (Date, Start Time, End Time)");
+      return false;
+    }
+    toast.success("Job posted successfully")
+    return true
+  }
+
   // function to post job
   const postJob = async () => {
     const formattedDate = date
@@ -115,7 +139,6 @@ export default function PostJobPage() {
       date: formattedDate,
       chosenLanguages,
       chosenProcedure: qualifications,
-      preferredDoctors,
       address,
       email,
       phone,
@@ -123,7 +146,7 @@ export default function PostJobPage() {
       totalPay: Number(totalPay.toFixed(2)),
       jobDescription,
       jobIncentives,
-      preferredGender,
+      preferredGender: preferredGender.charAt(0).toUpperCase() + preferredGender.slice(1).toLowerCase(),
       contactPerson,
       specialInstructions,
       shiftStart,
@@ -134,6 +157,7 @@ export default function PostJobPage() {
       shiftType,
       breakStart,
       breakEnd,
+      hasBreak
     };
     console.log("Payload being sent:", payLoad);
 
@@ -175,18 +199,22 @@ export default function PostJobPage() {
       const response = await axiosInstance.get(`/get-preferences/${clinicId}`);
       if (!response.data.error) {
         setQualifications(response.data.clinic.qualifications || []);
-        setLanguages(response.data.clinic.languages || []);
-        setPreferredDoctors(response.data.clinic.preferred_doctors_only);
-        setRate(response.data.clinic.default_rate);
 
-        setQualifications(response.data.clinic.qualifications || []);
-        setLanguages(response.data.clinic.languages || []);
-        setPreferredDoctors(response.data.clinic.preferred_doctors_only);
+        // Set up day and night rates
+        const dayRate = response.data.clinic.default_rate || 0;
+        const nightRate = response.data.clinic.night_rate || 0;
+        const hasNightRate = response.data.clinic.night_rate_available || false;
+
+        setDefaultDayRate(dayRate);
+        setDefaultNightRate(nightRate);
+        setNightRateAvailable(hasNightRate);
+
+        // Set initial rate to day rate
+        setRate(dayRate);
+        setShiftType("day");
+
         setChosenLanguages(response.data.clinic.languages);
-        setShiftStart(response.data.clinic.start_time);
-        setShiftEnd(response.data.clinic.end_time);
-        setRate(response.data.clinic.default_rate);
-        setPreferredGender(response.data.clinic.gender || ""); // <-- add this
+        setPreferredGender(response.data.clinic.gender || "");
       }
     } catch (error) {
       console.error(error);
@@ -224,10 +252,15 @@ export default function PostJobPage() {
           </p>
         </div>
         <div className="flex space-x-2">
-          <Button className="bg-blue-700 hover:bg-blue-900" onClick={() => {
-            postJob();
-            router.push("/clinic")
-          }}>
+          <Button
+            className="bg-blue-700 hover:bg-blue-900"
+            onClick={() => {
+              if (validateJobPost()) {
+                postJob();
+                router.push("/clinic");
+              }
+            }}
+          >
             Publish Job
           </Button>
         </div>
@@ -243,7 +276,7 @@ export default function PostJobPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Date</Label>
+              <Label>Date *</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -270,7 +303,7 @@ export default function PostJobPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="start-time">Start Time</Label>
+                <Label htmlFor="start-time">Start Time *</Label>
                 <div className="relative">
                   <Input
                     id="start-time"
@@ -284,7 +317,7 @@ export default function PostJobPage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="end-time">End Time</Label>
+                <Label htmlFor="end-time">End Time *</Label>
                 <div className="relative">
                   <Input
                     id="end-time"
@@ -315,22 +348,19 @@ export default function PostJobPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="shift-type">Shift Type</Label>
-              <select
-                id="shift-type"
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={shiftType}
-                onChange={(e) => {
-                  setShiftType(e.target.value);
-                }}
-              >
-                <option value="">Select Shift Type</option>
-                <option value="day">Day Shift</option>
-                <option value="night">Night Shift</option>
-              </select>
+              <Label htmlFor="break">Break?</Label>
+              <div className=" flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="break"
+                  className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                  checked={hasBreak}
+                  onChange={(e) => setHasBreak(e.target.checked)}
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {hasBreak && <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="Break-start">Break Start</Label>
                 <div className="relative">
@@ -359,9 +389,9 @@ export default function PostJobPage() {
                   <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
-            </div>
+            </div>}
 
-            <div className="flex items-center space-x-4 pt-2">
+            {hasBreak && <div className="flex items-center space-x-4 pt-2">
               <Label>Break Type:</Label>
               <Switch
                 id="paid-break"
@@ -375,10 +405,11 @@ export default function PostJobPage() {
               >
                 {paidBreak ? "Paid" : "Unpaid"}
               </span>
-            </div>
-            <CardDescription>
+              <CardDescription>
               Toggle to set break as paid or unpaid
-            </CardDescription>
+              </CardDescription>
+            </div>}
+            
           </CardContent>
         </Card>
 
@@ -390,8 +421,28 @@ export default function PostJobPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Conditional Shift Type and Rate Display */}
+            {nightRateAvailable && (
+              <div className="space-y-2">
+                <Label htmlFor="shift-type">Shift Type</Label>
+                <select
+                  id="shift-type"
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={shiftType}
+                  onChange={(e) => handleShiftTypeChange(e.target.value)}
+                >
+                  <option value="day">Day Shift</option>
+                  <option value="night">Night Shift</option>
+                </select>
+              </div>
+            )}
+
             <div className="space-y-2">
-              <Label htmlFor="day-hourly-rate">Hourly Rate (MYR)</Label>
+              <Label htmlFor="hourly-rate">
+                {nightRateAvailable
+                  ? `${shiftType === "day" ? "Day" : "Night"} Hourly Rate (RM)`
+                  : "Hourly Rate (RM) *"}
+              </Label>
               <Input
                 id="hourly-rate"
                 type="number"
@@ -401,7 +452,9 @@ export default function PostJobPage() {
                 }}
               />
               <CardDescription>
-                Set the hourly rate for this position
+                {nightRateAvailable
+                  ? `Rate automatically set based on your ${shiftType} shift preference`
+                  : "Set the hourly rate for this position"}
               </CardDescription>
             </div>
 
@@ -436,12 +489,9 @@ export default function PostJobPage() {
               <div className="grid grid-cols-2 gap-2">
                 {[
                   "Antenatal Care",
-                  "ECG",
-                  "Wound Care",
-                  "IM Injection",
-                  "Suturing",
-                  "Venipuncture",
-                  "Basic Surgery",
+                  "Ultrasound",
+                  "Surgical Procedure",
+                  "Sexual Health",
                   "Paeds Care",
                 ].map((procedure) => (
                   <div key={procedure} className="flex items-center space-x-2">
@@ -524,11 +574,8 @@ export default function PostJobPage() {
               <Label>Required Languages</Label>
               <div className="grid grid-cols-2 gap-2">
                 {[
-                  "English",
-                  "Bahasa Malaysia",
-                  "Mandarin",
-                  "Tamil",
-                  "Cantonese",
+                  "Chinese",
+                  "Tamil"
                 ].map((language) => (
                   <div key={language} className="flex items-center space-x-2">
                     <input
@@ -554,20 +601,6 @@ export default function PostJobPage() {
                 Pre-selected based on your profile preferences
               </CardDescription>
             </div>
-
-            <div className="flex items-center space-x-2 pt-2">
-              <Switch
-                id="preferred-only"
-                checked={preferredDoctors}
-                onCheckedChange={setPreferredDoctors}
-              />
-              <Label htmlFor="preferred-only">
-                Restrict to Preferred Doctors Only
-              </Label>
-            </div>
-            <CardDescription>
-              Default setting from your profile preferences
-            </CardDescription>
           </CardContent>
         </Card>
       </div>
@@ -665,8 +698,11 @@ export default function PostJobPage() {
         <Button
           className="gap-2 bg-blue-700 hover:bg-blue-900"
           onClick={() => {
-            postJob();
-            router.push("/clinic")
+            if (validateJobPost()) {
+              postJob();
+              router.push("/clinic");
+            }
+            
           }}
         >
           <Save className="h-4 w-4" />

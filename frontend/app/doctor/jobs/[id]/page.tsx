@@ -19,8 +19,6 @@ import {
   Mail,
   ArrowLeft,
   MessageSquare,
-  Bookmark,
-  Share2,
   ExternalLink,
   FileText,
   Gift,
@@ -30,6 +28,7 @@ import { cn } from "@/lib/utils";
 import React from "react";
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
+import { formatTo12Hour, formatTimeRange } from "@/utils/timeUtils";
 
 export default function JobDetailsPage({
   params,
@@ -40,6 +39,8 @@ export default function JobDetailsPage({
   const [job, setJob] = useState<any>();
   const [doctorId, setDoctorId] = useState<string | null>(null);
   const [clinicName, setClinicName] = useState("");
+  const [isApplying, setIsApplying] = useState(false);
+  const [applicationError, setApplicationError] = useState<string | null>(null);
   const router = useRouter();
   const getJob = async () => {
     const token = localStorage.getItem("doctorAccessToken");
@@ -61,9 +62,57 @@ export default function JobDetailsPage({
   };
 
   const postJobApplication = async () => {
+    if (!doctorId || !job) return;
+
+    setIsApplying(true);
+    setApplicationError(null);
+
     const token = localStorage.getItem("doctorAccessToken");
-    const payLoad = { id, doctorId, status: "Pending" };
+
     try {
+      // First, check for overlapping accepted jobs
+      const overlapCheck = await axiosInstance.get(
+        `/doctor-accepted-jobs/${doctorId}`,
+        {
+          headers: {
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+
+      if (!overlapCheck.data.error) {
+        const acceptedJobs = overlapCheck.data.jobs || [];
+
+        // Check if any accepted job overlaps with this job
+        const hasOverlap = acceptedJobs.some((acceptedJob: any) => {
+          // Only check jobs on the same date
+          if (acceptedJob.date !== job.date) return false;
+
+          // Check time overlap
+          const jobStart = job.start_time;
+          const jobEnd = job.end_time;
+          const acceptedStart = acceptedJob.start_time;
+          const acceptedEnd = acceptedJob.end_time;
+
+          return (
+            (jobStart < acceptedEnd && jobEnd > acceptedStart) ||
+            (jobStart < acceptedStart && jobEnd > acceptedStart) ||
+            (jobStart < acceptedEnd && jobEnd > acceptedEnd) ||
+            (jobStart >= acceptedStart && jobEnd <= acceptedEnd)
+          );
+        });
+
+        if (hasOverlap) {
+          setApplicationError(
+            "You already have an accepted job that overlaps with this time slot. Please check your schedule."
+          );
+          setIsApplying(false);
+          return;
+        }
+      }
+
+      // If no overlap, proceed with application
+      const payLoad = { id, doctorId, status: "Pending" };
       const result = await axiosInstance.post(
         "/post-job-application",
         payLoad,
@@ -73,12 +122,25 @@ export default function JobDetailsPage({
           },
         }
       );
+
       if (!result.data.error) {
         console.log("Application posted successfully");
+        router.push("/doctor");
+      } else {
+        setApplicationError(
+          result.data.message ||
+            "Failed to submit application. Please try again."
+        );
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      setApplicationError(
+        error.response?.data?.message ||
+          "An error occurred while submitting your application. Please try again."
+      );
     }
+
+    setIsApplying(false);
   };
 
   const googleMapsUrl = job?.address
@@ -86,6 +148,10 @@ export default function JobDetailsPage({
         clinicName
       )}`
     : "#";
+
+  const today = new Date();
+  const isPast =
+    today.setHours(0, 0, 0, 0) > new Date(job?.date).setHours(0, 0, 0, 0);
 
   const fetchClinicNames = async (job: any) => {
     const token = localStorage.getItem("doctorAccessToken");
@@ -118,8 +184,7 @@ export default function JobDetailsPage({
 
   function formatTime(timeStr?: string) {
     if (!timeStr) return "";
-    const [h, m] = timeStr.split(":");
-    return `${h}:${m}`;
+    return formatTo12Hour(timeStr);
   }
 
   return (
@@ -154,29 +219,17 @@ export default function JobDetailsPage({
                   </div>
                   <div>
                     <CardTitle className="text-2xl text-slate-900">
+                      Locum Doctor Job
+                    </CardTitle>
+                    <CardTitle className="text-xl text-slate-900">
                       {clinicName}
                     </CardTitle>
+
                     <CardDescription className="flex items-center mt-2 text-slate-600">
                       <MapPin className="h-4 w-4 mr-2" />
                       {job?.address}
                     </CardDescription>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 rounded-xl border-slate-200 hover:bg-slate-100"
-                  >
-                    <Bookmark className="h-5 w-5 text-slate-600" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="h-10 w-10 rounded-xl border-slate-200 hover:bg-slate-100"
-                  >
-                    <Share2 className="h-5 w-5 text-slate-600" />
-                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -274,7 +327,7 @@ export default function JobDetailsPage({
                 </div>
 
                 {/* Break Time */}
-                {job?.break_start && job?.break_end && (
+                {job?.has_break && job?.break_start && job?.break_end && (
                   <div className="flex items-center">
                     <Clock className="h-5 w-5 text-yellow-600 mr-2" />
                     <div>
@@ -286,31 +339,19 @@ export default function JobDetailsPage({
                           {formatTime(job.break_start)} -{" "}
                           {formatTime(job.break_end)}
                         </span>
-                        <span
-                          className={cn(
-                            "px-2 py-0.5 rounded text-xs font-medium border",
-                            job.paid_break
-                              ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                              : "bg-red-100 text-red-700 border-red-200"
-                          )}
-                        >
-                          {job.paid_break ? "Paid Break" : "Unpaid Break"}
-                        </span>
+                        {job?.has_break && (
+                          <span
+                            className={cn(
+                              "px-2 py-0.5 rounded text-xs font-medium border",
+                              job.paid_break
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                                : "bg-red-100 text-red-700 border-red-200"
+                            )}
+                          >
+                            {job.paid_break ? "Paid Break" : "Unpaid Break"}
+                          </span>
+                        )}
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Shift Type */}
-                {(job?.shift_type === "day" || job?.shift_type === "night") && (
-                  <div className="flex items-center">
-                    <div>
-                      <p className="text-xs font-medium text-slate-500">
-                        SHIFT TYPE
-                      </p>
-                      <p className="font-semibold text-blue-700 capitalize">
-                        {job.shift_type}
-                      </p>
                     </div>
                   </div>
                 )}
@@ -459,15 +500,29 @@ export default function JobDetailsPage({
               </div>
 
               <div className="space-y-3">
+                {applicationError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                    <p className="text-red-600 text-sm font-medium">
+                      {applicationError}
+                    </p>
+                  </div>
+                )}
                 <Button
-                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg"
+                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold py-3 rounded-xl shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isPast || isApplying}
                   onClick={() => {
                     postJobApplication();
-                    router.push("/doctor")
                   }}
                 >
-                  Apply for This Job
+                  {isApplying
+                    ? "Checking availability..."
+                    : "Apply for This Job"}
                 </Button>
+                {isPast && (
+                  <div className="flex items-center justify-center text-md text-red-500 font-semibold">
+                    Job has expired
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

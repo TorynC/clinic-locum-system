@@ -14,28 +14,85 @@ import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
-import { Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 export default function ProfilePage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [clinicName, setClinicName] = useState("");
   const [clinicDescription, setClinicDescription] = useState("");
-  const [clinicType, setClinicType] = useState("");
+  const [clinicType, setClinicType] = useState("general");
   const [clinicEmail, setClinicEmail] = useState("");
   const [clinicAddress, setClinicAddress] = useState("");
   const [clinicCity, setClinicCity] = useState("");
   const [clinicPostal, setClinicPostal] = useState("");
   const [clinicPhone, setClinicPhone] = useState("");
-  const [clinicWebsite, setClinicWebsite] = useState("");
   const [qualifications, setQualifications] = useState<string[]>([]);
   const [languages, setLanguages] = useState<string[]>([]);
-  const [preferredDoctors, setPreferredDoctors] = useState<boolean>(false);
   const [rate, setRate] = useState<number>(0);
-  const [start, setStart] = useState<string>("09:00");
-  const [end, setEnd] = useState<string>("18:00");
   const [state, setState] = useState("");
   const [doctor, setDoctor] = useState("");
   const [gender, setGender] = useState("");
+  const [nightRateAvailable, setNightRateAvailable] = useState<boolean>(false);
+  const [nightRate, setNightRate] = useState<number>(0);
+  const [activeTab, setActiveTab] = useState("general");
+  const router = useRouter();
+
+  // validation
+  const validateGeneralInfo = () => {
+    console.log("Validating general info:", { clinicName, clinicType }); // Add debugging
+    if (
+      !clinicName ||
+      clinicName.trim() === "" ||
+      !clinicType ||
+      clinicType.trim() === ""
+    ) {
+      toast.error("Please fill in all required fields (marked with *)");
+      return false;
+    }
+    return true;
+  };
+
+  const validateContactInfo = () => {
+    console.log("Validating contact info:", {
+      clinicAddress,
+      clinicCity,
+      state,
+      clinicPostal,
+      doctor,
+      clinicPhone,
+      clinicEmail,
+    }); // Add debugging
+
+    if (
+      !clinicAddress ||
+      clinicAddress.trim() === "" ||
+      !clinicCity ||
+      clinicCity.trim() === "" ||
+      !state ||
+      state.trim() === "" ||
+      !clinicPostal ||
+      !doctor ||
+      doctor.trim() === "" ||
+      !clinicPhone ||
+      clinicPhone.trim() === "" ||
+      !clinicEmail ||
+      clinicEmail.trim() === ""
+    ) {
+      toast.error("Please fill in all required fields (marked with *)");
+      return false;
+    }
+    return true;
+  };
+
+  const validatePreferences = () => {
+    console.log("Validating preferences:", { rate }); // Add debugging
+    if (!rate || rate <= 0) {
+      toast.error("Please enter a valid default rate");
+      return false;
+    }
+    return true;
+  };
 
   // function to save changes
   const handleSaveGeneral = async () => {
@@ -45,8 +102,10 @@ export default function ProfilePage() {
         type: clinicType,
         description: clinicDescription,
       });
+      toast.success("General information saved successfully");
     } catch (error) {
       console.error(error);
+      toast.error("Failed to save general information");
     }
   };
 
@@ -56,16 +115,17 @@ export default function ProfilePage() {
       const response = await axiosInstance.patch(`/preferences/${clinicId}`, {
         qualifications,
         languages,
-        preferredDoctors,
+        nightRate,
+        nightRateAvailable,
         rate,
-        start,
-        end,
-        gender, 
+        gender,
       });
 
       console.log("Preferences saved successfully:", response.data);
+      toast.success("Clinic preferences saved successfully");
     } catch (error) {
       console.error("Error saving preferences:", error);
+      toast.error("Failed to save clinic preferences");
     }
   };
   // function to save name
@@ -98,14 +158,15 @@ export default function ProfilePage() {
       await axiosInstance.patch(`/contact-details/${clinicId}`, {
         address: clinicAddress,
         city: clinicCity,
-        state, // <-- add this
+        state,
         postal: clinicPostal,
         phone: clinicPhone,
-        website: clinicWebsite,
-        doctor, // <-- add this
+        doctor,
       });
+      toast.success("Contact information saved successfully");
     } catch (error) {
       console.error(error);
+      toast.error("Failed to save contact information");
     }
   };
 
@@ -116,11 +177,10 @@ export default function ProfilePage() {
       if (!response.data.error) {
         setQualifications(response.data.clinic.qualifications || []);
         setLanguages(response.data.clinic.languages || []);
-        setPreferredDoctors(response.data.clinic.preferred_doctors_only);
-        setRate(response.data.clinic.default_rate);
-        setStart(response.data.clinic.start_time);
-        setEnd(response.data.clinic.end_time);
-        setGender(response.data.clinic.gender)
+        setRate(response.data.clinic.default_rate || 0);
+        setGender(response.data.clinic.gender);
+        setNightRate(response.data.clinic.night_rate);
+        setNightRateAvailable(response.data.clinic.night_rate_available);
       }
     } catch (error) {
       console.error(error);
@@ -167,7 +227,6 @@ export default function ProfilePage() {
         setClinicCity(response.data.clinic.city);
         setClinicPostal(response.data.clinic.postal);
         setClinicPhone(response.data.clinic.phone);
-        setClinicWebsite(response.data.clinic.website);
         setState(response.data.clinic.state || ""); // <-- add this
         setDoctor(response.data.clinic.doctor || ""); // <-- add this
       }
@@ -201,7 +260,7 @@ export default function ProfilePage() {
         </p>
       </div>
 
-      <Tabs defaultValue="general">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3 max-w-md bg-blue-100 text-blue-600">
           <TabsTrigger value="general">General Info</TabsTrigger>
           <TabsTrigger value="contact">Contact Details</TabsTrigger>
@@ -211,38 +270,33 @@ export default function ProfilePage() {
         <TabsContent value="general" className="mt-6">
           <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-black">
-                General Information
-              </CardTitle>
+              <CardTitle className="text-black">General Information</CardTitle>
               <CardDescription>
                 Update your clinic's basic information
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="clinic-name">Clinic Name</Label>
+                <Label htmlFor="clinic-name">Clinic Name *</Label>
                 <Input
                   id="clinic-name"
-                  value={clinicName ? `${clinicName}` : ""}
-                  onChange={(e) => {
-                    setClinicName(e.target.value);
-                  }}
+                  value={clinicName || ""}
+                  onChange={(e) => setClinicName(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="clinic-type">Clinic Type</Label>
+                <Label htmlFor="clinic-type">Clinic Type *</Label>
                 <select
                   id="clinic-type"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={clinicType ? `${clinicType}` : "medical"}
+                  value={clinicType || "general"} // <-- Change "medical" to "general" to match first option
                   onChange={(e) => {
                     setClinicType(e.target.value);
                   }}
                 >
-                  <option value="medical">Medical Clinic</option>
+                  <option value="general">GP Clinic</option>
                   <option value="dental">Dental Clinic</option>
-                  <option value="specialist">Specialist Clinic</option>
                   <option value="hospital">Hospital</option>
                 </select>
               </div>
@@ -262,8 +316,11 @@ export default function ProfilePage() {
               <Button
                 className="bg-blue-700 hover:bg-blue-900"
                 onClick={() => {
-                  handleSaveGeneral();
-                  handleSaveName();
+                  if (validateGeneralInfo()) {
+                    handleSaveGeneral();
+                    handleSaveName();
+                    setActiveTab("contact");
+                  }
                 }}
               >
                 Save Changes
@@ -273,7 +330,7 @@ export default function ProfilePage() {
         </TabsContent>
 
         <TabsContent value="contact" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
               <CardTitle className="text-black-900">Contact Details</CardTitle>
               <CardDescription>
@@ -282,7 +339,7 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
+                <Label htmlFor="address">Address *</Label>
                 <Input
                   id="address"
                   value={clinicAddress}
@@ -294,10 +351,10 @@ export default function ProfilePage() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="city">City</Label>
+                  <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
-                    value={clinicCity ? `${clinicCity}` : ""}
+                    value={clinicCity || ""}
                     onChange={(e) => {
                       setClinicCity(e.target.value);
                     }}
@@ -305,7 +362,7 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="state">State</Label>
+                  <Label htmlFor="state">State * </Label>
                   <Input
                     id="state"
                     className="w-full"
@@ -316,10 +373,10 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="postal-code">Postal Code</Label>
+                  <Label htmlFor="postal-code">Postal Code *</Label>
                   <Input
                     id="postal-code"
-                    value={clinicPostal ? `${clinicPostal}` : ""}
+                    value={clinicPostal || ""}
                     onChange={(e) => {
                       setClinicPostal(e.target.value);
                     }}
@@ -329,7 +386,7 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="doctor">Person In Charge (PIC) Name</Label>
+                <Label htmlFor="doctor">Person In Charge (PIC) Name * </Label>
                 <Input
                   id="doctor"
                   value={doctor}
@@ -340,40 +397,33 @@ export default function ProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
+                <Label htmlFor="phone">Phone Number *</Label>
                 <Input
                   id="phone"
                   type="tel"
-                  value={clinicPhone ? `${clinicPhone}` : ""}
+                  value={clinicPhone || ""}
                   onChange={(e) => setClinicPhone(e.target.value)}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
-                  value={clinicEmail ? `${clinicEmail}` : ""}
+                  value={clinicEmail || ""}
                   onChange={(e) => setClinicEmail(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="website">Website</Label>
-                <Input
-                  id="website"
-                  type="url"
-                  value={clinicWebsite ? `${clinicWebsite}` : ""}
-                  onChange={(e) => setClinicWebsite(e.target.value)}
                 />
               </div>
 
               <Button
                 className="bg-blue-700 hover:bg-blue-900"
                 onClick={() => {
-                  handleSaveContact();
-                  handleSaveEmail();
+                  if (validateContactInfo()) {
+                    handleSaveContact();
+                    handleSaveEmail();
+                    setActiveTab("preferences");
+                  }
                 }}
               >
                 Save Changes
@@ -392,7 +442,7 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent className="space-y-4 ">
               <div className="space-y-2">
-                <Label htmlFor="default-rate">Default Rate (MYR)</Label>
+                <Label htmlFor="default-rate">Default Rate/Hour (MYR) *</Label>
                 <Input
                   id="default-rate"
                   type="number"
@@ -403,50 +453,45 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="start-time">Default Shift Start Time</Label>
-                  <div className="relative">
-                    <Input
-                      id="start-time"
-                      type="time"
-                      value={start}
-                      onChange={(e) => {
-                        setStart(e.target.value);
-                      }}
-                    />
-                    <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="end-time">Default Shift End Time</Label>
-                  <div className="relative">
-                    <Input
-                      id="end-time"
-                      type="time"
-                      value={end}
-                      onChange={(e) => {
-                        setEnd(e.target.value);
-                      }}
-                    />
-                    <Clock className="absolute right-3 top-2.5 h-5 w-5 text-gray-400" />
-                  </div>
+              <div className="space-y-2">
+                <Label htmlFor="night-rate">Night Rate Available?</Label>
+                <div className=" flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="night-rate"
+                    className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                    checked={nightRateAvailable}
+                    onChange={(e) => setNightRateAvailable(e.target.checked)}
+                  />
                 </div>
               </div>
+
+              {nightRateAvailable && (
+                <div className="space-y-2">
+                  <Label htmlFor="night-rate">
+                    Default Night Rate/Hour (MYR)
+                  </Label>
+                  <Input
+                    id="night-rate"
+                    type="number"
+                    value={Number(nightRate)}
+                    onChange={(e) => {
+                      setNightRate(Number(e.target.value));
+                    }}
+                  />
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Preferred Doctor Qualifications</Label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    "Antenatal Care",
-                    "IM Injection",
-                    "ECG",
-                    "Suturing",
-                    "Paeds Care",
-                    "Venipuncture",
-                    "Wound Care",
-                    "Basic Surgery",
-                  ].map((skill) => (
+                  "Antenatal Care",
+                  "Ultrasound",
+                  "Surgical Procedure",
+                  "Sexual Health",
+                  "Paeds Care",
+                ].map((skill) => (
                     <div key={skill} className="flex items-center space-x-2 ">
                       <input
                         type="checkbox"
@@ -473,11 +518,8 @@ export default function ProfilePage() {
                 <Label>Preferred Languages</Label>
                 <div className="grid grid-cols-2 gap-2 ">
                   {[
-                    "English",
-                    "Bahasa Malaysia",
-                    "Mandarin",
-                    "Tamil",
-                    "Cantonese",
+                    "Chinese",
+                    "Tamil"
                   ].map((language) => (
                     <div
                       key={language}
@@ -552,22 +594,18 @@ export default function ProfilePage() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="preferred-only"
-                  className="h-4 w-4 rounded border-gray-300 cursor-pointer"
-                  checked={preferredDoctors}
-                  onChange={(e) => setPreferredDoctors(e.target.checked)}
-                />
-                <Label htmlFor="preferred-only">
-                  Default to "Preferred Doctors Only" for new job postings
-                </Label>
-              </div>
-
               <Button
                 className="bg-blue-700 hover:bg-blue-900"
-                onClick={handleSavePreferences}
+                onClick={async () => {
+                  if (validatePreferences()) {
+                    await handleSavePreferences();
+                    // Check if this completes the profile setup
+                    toast.success(
+                      "Profile setup completed! Welcome to LocumLah!"
+                    );
+                    router.push("/clinic");
+                  }
+                }}
               >
                 Save Preferences
               </Button>

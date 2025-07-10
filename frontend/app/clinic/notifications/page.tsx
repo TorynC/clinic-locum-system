@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import { Bell, UserPlus, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 
 const ClinicNotificationsPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   // Replace with your actual clinic ID fetching logic
   const clinicId =
@@ -17,21 +19,25 @@ const ClinicNotificationsPage = () => {
     if (!clinicId) return;
     setLoading(true);
     axiosInstance
-    // get notifications
+      // get notifications
       .get(`/notifications/clinic/${clinicId}`)
       .then((res) => setNotifications(res.data.notifications || []))
       .finally(() => setLoading(false));
   }, [clinicId]);
 
-  // Mark notification as read in the backend 
+  // Mark notification as read in the backend
   const markAsRead = async (id: number) => {
     try {
       await axiosInstance.patch(`/notifications/${id}/read`, {});
-      setNotifications((prev) => prev.map((notif) => notif.id === id ? { ...notif, is_read:true }: notif))
+      setNotifications((prev) =>
+        prev.map((notif) =>
+          notif.id === id ? { ...notif, is_read: true } : notif
+        )
+      );
     } catch (error) {
-      console.error(error) 
+      console.error(error);
     }
-  }
+  };
 
   return (
     <div className="max-w-2xl mx-auto py-8">
@@ -47,10 +53,10 @@ const ClinicNotificationsPage = () => {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`p-4 rounded border flex items-start gap-3 cursor-pointer hover:bg-blue-200 ${
+              className={`p-4 rounded border flex items-start gap-3 ${
                 n.is_read ? "bg-white" : "bg-purple-50 border-purple-200"
-              }`} 
-              onClick={() => {markAsRead(n.id)}}
+              }`}
+              onClick={() => markAsRead(n.id)}
             >
               <div>
                 {n.type === "application" ? (
@@ -73,18 +79,29 @@ const ClinicNotificationsPage = () => {
                     </Badge>
                   )}
                   {!n.is_read && (
-                  <Badge
-                    variant="default"
-                    className="bg-slate-700 text-white"
-                  >
-                    Mark as Read?
-                  </Badge>
-                )}
+                    <Badge
+                      variant="default"
+                      className="bg-slate-700 text-white"
+                    >
+                      Mark as Read?
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-sm text-gray-700">{n.message}</div>
                 <div className="text-xs text-gray-400 mt-1">
                   {new Date(n.created_at).toLocaleString()}
                 </div>
+                {n.job_id && (
+                  <button
+                    className="mt-2 px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/clinic/jobs/${n.job_id}`);
+                    }}
+                  >
+                    View Job Details
+                  </button>
+                )}
               </div>
             </div>
           ))}

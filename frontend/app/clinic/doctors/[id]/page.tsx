@@ -11,6 +11,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Heart } from "lucide-react";
 import React from "react";
+import Link from "next/link";
 
 export default function ClinicDoctorProfilePage({
   params,
@@ -98,6 +99,7 @@ export default function ClinicDoctorProfilePage({
     }
   };
 
+
   return (
     <div className="max-w-4xl mx-auto py-10 space-y-8">
       <Card className="border-purple-100">
@@ -170,6 +172,10 @@ export default function ClinicDoctorProfilePage({
                 )}
               </div>
               <div>
+                <span className="font-semibold">Bank Name:</span>
+                <p className=" text-gray-700 text-sm">{profile.bank_name}</p>
+              </div>
+              <div>
                 <span className="font-semibold">Bank Account Number:</span>
                 <p className=" text-gray-700 text-sm">{profile.bank_number}</p>
               </div>
@@ -203,9 +209,6 @@ export default function ClinicDoctorProfilePage({
                   />
                 </button>
               </div>
-              <div className="text-gray-500">
-                {profile.specialization || "No specialization"}
-              </div>
               <div className="text-sm text-gray-500 mt-1">
                 {profile.experience_years != null
                   ? `${profile.experience_years} years experience`
@@ -228,7 +231,9 @@ export default function ClinicDoctorProfilePage({
               <div>
                 <div className="font-medium text-slate-900">Contact</div>
                 <div className="text-sm text-gray-700">{doctor.email}</div>
-                <div className="text-sm text-gray-700">{profile.phone}</div>
+                <Link href={`https://api.whatsapp.com/send?phone=${profile.phone.split("+")[1]}`}>
+                <div className="text-sm text-purple-700 hover:cursor-pointer underline">{profile.phone}</div>
+                </Link>
               </div>
               <div>
                 <div className="font-medium text-slate-900">Location</div>
@@ -246,7 +251,7 @@ export default function ClinicDoctorProfilePage({
             </div>
             <div className="flex flex-wrap gap-2 mt-2">
               {profile.skills?.map((skill: string) => (
-                <Badge key={skill} className="bg-purple-100 text-purple-700">
+                <Badge key={skill} className="bg-slate-100 text-black">
                   {skill}
                 </Badge>
               ))}
@@ -263,9 +268,9 @@ export default function ClinicDoctorProfilePage({
       </Card>
 
       {/* Work Experience */}
-      <Card className="border-purple-100">
+      <Card className="border-blue-100">
         <CardHeader>
-          <CardTitle className="text-purple-900">
+          <CardTitle className="text-black">
             Professional Experience
           </CardTitle>
         </CardHeader>
@@ -274,7 +279,7 @@ export default function ClinicDoctorProfilePage({
             profile.work_experience.map((exp: any) => (
               <div
                 key={exp.id}
-                className="p-4 border border-purple-100 rounded-lg bg-purple-50"
+                className="p-4 border border-blue-100 rounded-lg bg-slate-50"
               >
                 <div className="flex flex-col md:flex-row md:items-center gap-2">
                   <div className="flex-1">

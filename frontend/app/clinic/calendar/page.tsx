@@ -3,14 +3,11 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-} from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import axiosInstance from "@/utils/axiosinstance";
+import { formatTimeRange } from "@/utils/timeUtils";
 
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
@@ -20,11 +17,11 @@ export default function CalendarPage() {
   const [events, setEvents] = useState<any[]>([]);
   const [doctors, setDoctors] = useState<any[]>([]);
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  
+
   // Generate calendar days (simplified for example)
   const calendarDays = getCalendarDays(currentDate);
-  
-  // get jobs 
+
+  // get jobs
   const getJobs = async () => {
     try {
       const response = await axiosInstance.get(`/get-jobs/${clinicId}/jobs`);
@@ -32,36 +29,84 @@ export default function CalendarPage() {
         setJobs(response.data.jobs);
       }
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
 
-  // get doctors 
+  // get doctors
   const getDoctors = async () => {
-    try { 
-      const response = await axiosInstance.get(`/get-doctors`)
+    try {
+      const response = await axiosInstance.get(`/get-doctors`);
       if (!response.data.error) {
-        setDoctors(response.data.doctors)
+        setDoctors(response.data.doctors);
       }
     } catch (error) {
       console.error(error);
     }
-  }
+  };
 
-  // Get real calendar days
+  // Get real calendar days with proper weekday alignment
   function getCalendarDays(date: Date) {
     const year = date.getFullYear();
     const month = date.getMonth();
 
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Get the first day of the month and find what day of the week it is
+    const firstDayOfMonth = new Date(year, month, 1);
+    const firstDayWeekday = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const current = new Date(year, month, i + 1);
-      return {
-        date: current,
-        isToday: isSameDay(current, new Date()),
-      };
-    });
+    // Get the last day of the month
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+
+    // Calculate how many days we need from the previous month
+    const daysFromPrevMonth = firstDayWeekday;
+
+    // Calculate how many days we need from the next month to fill the grid
+    const totalCells = 42; // 6 weeks × 7 days
+    const daysFromNextMonth = totalCells - daysFromPrevMonth - daysInMonth;
+
+    const calendarDays = [];
+
+    // Add days from previous month
+    if (daysFromPrevMonth > 0) {
+      const prevMonth = new Date(year, month - 1, 1);
+      const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+      for (
+        let i = daysInPrevMonth - daysFromPrevMonth + 1;
+        i <= daysInPrevMonth;
+        i++
+      ) {
+        const dayDate = new Date(year, month - 1, i);
+        calendarDays.push({
+          date: dayDate,
+          isToday: isSameDay(dayDate, new Date()),
+          isCurrentMonth: false,
+        });
+      }
+    }
+
+    // Add days from current month
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dayDate = new Date(year, month, i);
+      calendarDays.push({
+        date: dayDate,
+        isToday: isSameDay(dayDate, new Date()),
+        isCurrentMonth: true,
+      });
+    }
+
+    // Add days from next month
+    for (let i = 1; i <= daysFromNextMonth; i++) {
+      const dayDate = new Date(year, month + 1, i);
+      calendarDays.push({
+        date: dayDate,
+        isToday: isSameDay(dayDate, new Date()),
+        isCurrentMonth: false,
+      });
+    }
+
+    return calendarDays;
   }
 
   function getWeekDays(date: Date) {
@@ -77,7 +122,7 @@ export default function CalendarPage() {
       };
     });
   }
-  console.log(events)
+  console.log(events);
   function isSameDay(a: Date, b: Date) {
     return (
       a.getFullYear() === b.getFullYear() &&
@@ -105,29 +150,29 @@ export default function CalendarPage() {
 
   const nextWeek = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() + 7)
-    setCurrentDate(newDate); 
+    newDate.setDate(currentDate.getDate() + 7);
+    setCurrentDate(newDate);
   };
 
   const prevWeek = () => {
     const newDate = new Date(currentDate);
-    newDate.setDate(currentDate.getDate() - 7)
+    newDate.setDate(currentDate.getDate() - 7);
     setCurrentDate(newDate);
-  }
+  };
 
   const tomorrow = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() + 1);
     setCurrentDate(newDate);
-  }
+  };
 
   const yesterday = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() - 1);
     setCurrentDate(newDate);
-  }
+  };
 
-  const today = currentDate
+  const today = currentDate;
 
   useEffect(() => {
     const storedId = localStorage.getItem("clinicId");
@@ -141,57 +186,71 @@ export default function CalendarPage() {
       getJobs();
       getDoctors();
     }
-  }, [clinicId])
+  }, [clinicId]);
 
   useEffect(() => {
-      if (jobs.length > 0 && doctors.length > 0) {
+    if (jobs.length > 0 && doctors.length > 0) {
       const formattedEvents = jobs.map((job) => {
-      const utcDate = new Date(job.date);
-      const malaysiaDate = new Date(utcDate.getTime() + 28800000);
-      const doctorObj = doctors.find(d => d.id === job.doctor_id)
-      // Parse time components
-      const [startH, startM, startS] = job.start_time.split(':').map(Number);
-      const [endH, endM, endS] = job.end_time.split(':').map(Number);
+        const utcDate = new Date(job.date);
+        const malaysiaDate = new Date(utcDate.getTime() + 28800000);
+        const doctorObj = doctors.find((d) => d.id === job.doctor_id);
+        // Parse time components
+        const [startH, startM, startS] = job.start_time.split(":").map(Number);
+        const [endH, endM, endS] = job.end_time.split(":").map(Number);
 
-      // Set times on Malaysia date
-      const start = new Date(malaysiaDate)
-      start.setHours(startH, startM, startS);
+        // Set times on Malaysia date
+        const start = new Date(malaysiaDate);
+        start.setHours(startH, startM, startS);
 
-      const end = new Date(malaysiaDate);
-      end.setHours(endH, endM, endS);
+        const end = new Date(malaysiaDate);
+        end.setHours(endH, endM, endS);
 
-      if (end <= start) {
-        end.setDate(end.getDate() + 1)
-      }
-      return {
-        start,
-        end,
-        status: job.status,
-        id: job.id,
-        start_time: job.start_time,
-        end_time: job.end_time,
-        doctor_name: doctorObj ? doctorObj.name :  ""
-      };
-    });
-    setEvents(formattedEvents);
-  }
-}, [jobs, doctors]);
-
+        if (end <= start) {
+          end.setDate(end.getDate() + 1);
+        }
+        return {
+          start,
+          end,
+          status: job.status,
+          id: job.id,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          doctor_name: doctorObj ? doctorObj.name : "",
+        };
+      });
+      setEvents(formattedEvents);
+    }
+  }, [jobs, doctors]);
 
   const getEventsforDayMonth = (day: Date) => {
-    return events.filter(event =>
-      event.start.getDate() === day.getDate() &&
-      event.start.getMonth() === day.getMonth() &&
-      event.start.getFullYear() === day.getFullYear()
-    )
-  }
+    return events.filter(
+      (event) =>
+        event.start.getDate() === day.getDate() &&
+        event.start.getMonth() === day.getMonth() &&
+        event.start.getFullYear() === day.getFullYear()
+    );
+  };
 
   const getEventsforDayWeek = (day: Date) => {
-    const startOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 0, 0, 0);
-    const endOfDay = new Date(day.getFullYear(), day.getMonth(), day.getDate(), 23, 59, 59);
+    const startOfDay = new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      0,
+      0,
+      0
+    );
+    const endOfDay = new Date(
+      day.getFullYear(),
+      day.getMonth(),
+      day.getDate(),
+      23,
+      59,
+      59
+    );
 
-    return events.filter(event =>
-      event.end > startOfDay && event.start < endOfDay
+    return events.filter(
+      (event) => event.end > startOfDay && event.start < endOfDay
     );
   };
 
@@ -202,7 +261,9 @@ export default function CalendarPage() {
       case "Accepted":
         return "bg-green-100 border border-green-400 text-green-800";
       case "Completed":
-        return "bg-indigo-100 border border-indigo-400 text-indigo-800";
+        return "bg-blue-200 border border-blue-400 text-blue-800";
+      case "Urgent":
+        return "bg-red-200 border border-red-400 text-red-800";
       default:
         return "bg-gray-100 border border-gray-400 text-gray-800";
     }
@@ -213,11 +274,7 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-black">Calendar</h1>
         <div className="flex items-center space-x-2">
-          <Button
-            size="sm"
-            asChild
-            className="bg-blue-700 hover:bg-blue-900"
-          >
+          <Button size="sm" asChild className="bg-blue-700 hover:bg-blue-900">
             <Link href="/clinic/post-job">
               <Plus className="h-4 w-4 mr-2" />
               Post Job
@@ -235,7 +292,13 @@ export default function CalendarPage() {
                 variant="outline"
                 size="icon"
                 className="border-purple-200 text-blue-700"
-                onClick={viewMode === "month" ? prevMonth : viewMode === "week" ? prevWeek : yesterday}
+                onClick={
+                  viewMode === "month"
+                    ? prevMonth
+                    : viewMode === "week"
+                    ? prevWeek
+                    : yesterday
+                }
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -246,7 +309,13 @@ export default function CalendarPage() {
                 variant="outline"
                 size="icon"
                 className="border-purple-200 text-purple-700"
-                onClick={viewMode === "month" ? nextMonth : viewMode === "week" ? nextWeek : tomorrow}
+                onClick={
+                  viewMode === "month"
+                    ? nextMonth
+                    : viewMode === "week"
+                    ? nextWeek
+                    : tomorrow
+                }
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -279,36 +348,38 @@ export default function CalendarPage() {
                   key={i}
                   className={cn(
                     "calendar-day border rounded-md p-1",
-                    !day.date
+                    !day.isCurrentMonth
                       ? "bg-gray-50 text-gray-400"
                       : "hover:bg-blue-50 cursor-pointer",
                     day.isToday && "ring-2 ring-blue-400"
                   )}
                 >
-                  {day.date && (
-                    <>
-                      <div>
+                  <div>
+                    <div
+                      className={cn(
+                        "text-right p-1 font-medium",
+                        day.isToday && "text-blue-600",
+                        !day.isCurrentMonth && "text-gray-400"
+                      )}
+                    >
+                      {day.date.getDate()}
+                    </div>
+                    {day.isCurrentMonth &&
+                      getEventsforDayMonth(day.date).map((event) => (
                         <div
+                          key={event.id}
                           className={cn(
-                            "text-right p-1 font-medium",
-                            day.isToday && "text-blue-600"
+                            "text-xs truncate rounded p-0.5 flex-col z-0 ",
+                            getJobColor(event.status)
                           )}
                         >
-                          {day.date.getDate()}
+                          {event.doctor_name}
+                          <div className=" text-xs z-10">
+                            {formatTimeRange(event.start_time, event.end_time)}
+                          </div>
                         </div>
-                          {getEventsforDayMonth(day.date).map(event => (
-                            <div key={event.id}  className={cn(
-                              "text-xs truncate rounded p-0.5 flex-col z-0 ",
-                              getJobColor(event.status))}>
-                              {event.doctor_name} 
-                              <div className=" text-xs z-10">
-                                {`${event.start_time}-${event.end_time}`}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                    </>
-                  )}
+                      ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -319,7 +390,10 @@ export default function CalendarPage() {
                 {getWeekDays(currentDate).map((day, i) => (
                   <div
                     key={i}
-                    className={ cn("border-r border-b p-2 text-center bg-blue-50 font-semibold", day.isToday && "bg-blue-300")}
+                    className={cn(
+                      "border-r border-b p-2 text-center bg-blue-50 font-semibold",
+                      day.isToday && "bg-blue-300"
+                    )}
                   >
                     {days[day.date.getDay()]} {day.date.getDate()}
                   </div>
@@ -328,33 +402,62 @@ export default function CalendarPage() {
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-blue-50 text-gray-500 flex flex-col ">
-                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
+                      {hour === 0
+                        ? "12AM"
+                        : hour < 12
+                        ? `${hour}AM`
+                        : hour === 12
+                        ? "12PM"
+                        : `${hour - 12}PM`}
                     </div>
-                      {getWeekDays(currentDate).map((day, i) => (
-                    <div
-                      key={i}
-                      className="border-r border-b h-25 hover:bg-blue-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex "
-                    >
-                      {getEventsforDayWeek(day.date)
-                          .filter(event => 
-                            (event.start <= new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), hour, 59, 59)) &&
-                            (event.end > new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), hour, 0, 0)))
-                            .map(event => (
-                            <div key={event.id}  className={cn(
-                              "text-xs truncate rounded p-0.5 flex-col z-0 ",
-                              getJobColor(event.status))}>
-                              {event.doctor_name} 
+                    {getWeekDays(currentDate).map((day, i) => (
+                      <div
+                        key={i}
+                        className="border-r border-b h-25 hover:bg-blue-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex "
+                      >
+                        {getEventsforDayWeek(day.date)
+                          .filter(
+                            (event) =>
+                              event.start <=
+                                new Date(
+                                  day.date.getFullYear(),
+                                  day.date.getMonth(),
+                                  day.date.getDate(),
+                                  hour,
+                                  59,
+                                  59
+                                ) &&
+                              event.end >
+                                new Date(
+                                  day.date.getFullYear(),
+                                  day.date.getMonth(),
+                                  day.date.getDate(),
+                                  hour,
+                                  0,
+                                  0
+                                )
+                          )
+                          .map((event) => (
+                            <div
+                              key={event.id}
+                              className={cn(
+                                "text-xs truncate rounded p-0.5 flex-col z-0 ",
+                                getJobColor(event.status)
+                              )}
+                            >
+                              {event.doctor_name}
                               <div className=" text-xs z-10">
-                                {`${event.start_time}-${event.end_time}`}
+                                {formatTimeRange(
+                                  event.start_time,
+                                  event.end_time
+                                )}
                               </div>
                             </div>
-                        ))}
-                      
-                    </div>
-                  ))}
+                          ))}
+                      </div>
+                    ))}
                   </React.Fragment>
                 ))}
-                
               </div>
             </>
           ) : viewMode === "day" ? (
@@ -362,30 +465,66 @@ export default function CalendarPage() {
               <div className="grid grid-cols-[80px_1fr] border-t border-l text-sm">
                 <div className="border-r border-b p-2 bg-blue-50"></div>
                 {today && (
-                  <div className={cn("border-b p-2 text-center bg-blue-50 font-semibold", isSameDay(today, new Date()) && "bg-blue-300")}>
-                    {days[today.getDay()]} {today.getDate()} 
+                  <div
+                    className={cn(
+                      "border-b p-2 text-center bg-blue-50 font-semibold",
+                      isSameDay(today, new Date()) && "bg-blue-300"
+                    )}
+                  >
+                    {days[today.getDay()]} {today.getDate()}
                   </div>
                 )}
 
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-blue-50 text-gray-500">
-                      {hour === 0 ? "12AM" : hour < 12? `${hour}AM`: hour === 12? "12PM" : `${hour - 12}PM`}
+                      {hour === 0
+                        ? "12AM"
+                        : hour < 12
+                        ? `${hour}AM`
+                        : hour === 12
+                        ? "12PM"
+                        : `${hour - 12}PM`}
                     </div>
                     <div className="border-r border-b h-25 hover:bg-blue-50 relative">
                       {getEventsforDayWeek(today)
-                          .filter(event => 
-                            (event.start <= new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 59, 59)) &&
-                            (event.end > new Date(today.getFullYear(), today.getMonth(), today.getDate(), hour, 0, 0)))
-                            .map(event => (
-                            <div key={event.id}  className={cn(
+                        .filter(
+                          (event) =>
+                            event.start <=
+                              new Date(
+                                today.getFullYear(),
+                                today.getMonth(),
+                                today.getDate(),
+                                hour,
+                                59,
+                                59
+                              ) &&
+                            event.end >
+                              new Date(
+                                today.getFullYear(),
+                                today.getMonth(),
+                                today.getDate(),
+                                hour,
+                                0,
+                                0
+                              )
+                        )
+                        .map((event) => (
+                          <div
+                            key={event.id}
+                            className={cn(
                               "text-xs truncate rounded p-0.5 flex-col z-0 ",
-                              getJobColor(event.status))}>
-                              {event.doctor_name} 
-                              <div className=" text-xs z-10">
-                                {`${event.start_time}-${event.end_time}`}
-                              </div>
+                              getJobColor(event.status)
+                            )}
+                          >
+                            {event.doctor_name}
+                            <div className=" text-xs z-10">
+                              {formatTimeRange(
+                                event.start_time,
+                                event.end_time
+                              )}
                             </div>
+                          </div>
                         ))}
                     </div>
                   </React.Fragment>
@@ -405,16 +544,18 @@ export default function CalendarPage() {
           </div>
           <div className="flex items-center">
             <div className="w-3 h-3 rounded-full bg-green-100 border border-green-400 mr-2"></div>
-            <span className="text-sm">Accepted</span>
+            <span className="text-sm">Confirmed</span>
           </div>
           <div className="flex items-center">
             <div className="w-3 h-3 rounded-full bg-indigo-100 border border-indigo-400 mr-2"></div>
             <span className="text-sm">Completed</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-red-100 border border-red-400 mr-2"></div>
+            <span className="text-sm">Urgent</span>
           </div>
         </div>
       </div>
     </div>
   );
 }
-
-

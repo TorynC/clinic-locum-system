@@ -157,8 +157,8 @@ function DoctorCard({
   doctorProfiles: any[];
 }) {
   const profile = doctorProfiles.find((p) => p.id === doctor.id);
+  const workplace = profile?.work_experience[0]?.place || "No Current Workplace";
 
-  const languages = profile?.languages || [];
   const skills = profile?.skills || [];
 
   return (
@@ -170,35 +170,47 @@ function DoctorCard({
               {doctor.name?.charAt(0) || "D"}
             </div>
             <div>
-              <h3 className="font-medium">{doctor.name}</h3>
-              <p className="text-sm text-gray-500">
-                {doctor.specialty || "General Practice"}
-              </p>
+              <h3 className="font-semibold">{doctor?.name}</h3>
+              <p className="text-sm">{profile?.experience_years} years</p>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-red-500"
-            onClick={onToggleFavorite}
-          >
-            {preferred ? (
-              <Heart className="h-5 w-5 fill-red-500" />
-            ) : (
-              <HeartOff className="h-5 w-5" />
-            )}
-          </Button>
+          <div className="flex items-center">
+            <div className="flex items-center">
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 px-2 py-1 text-yellow-600 border-yellow-300 bg-yellow-50 font-medium"
+              >
+                <span className="text-sm">
+                  {profile?.reliability_rating ?? "-"}
+                </span>
+                <Star className="h-4 w-4 ml-0.5 fill-yellow-400 text-yellow-500" />
+              </Badge>
+            </div>
+
+            <Button
+              variant="ghost"
+              size="icon"
+              className="text-red-500"
+              onClick={onToggleFavorite}
+            >
+              {preferred ? (
+                <Heart className="h-5 w-5 fill-red-500" />
+              ) : (
+                <HeartOff className="h-5 w-5" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <div className="space-y-3">
           <div>
-            <p className="text-xs font-medium text-gray-500 mb-1">LANGUAGES</p>
+            <p className="text-xs font-medium text-gray-500 mb-1">
+              CURRENT WORKPLACE
+            </p>
             <div className="flex flex-wrap gap-1">
-              {languages.map((language: string) => (
-                <Badge key={language} variant="outline" className="text-xs">
-                  {language}
-                </Badge>
-              ))}
+              <Badge variant={"outline"} className="text-xs">
+                {workplace}
+              </Badge>
             </div>
           </div>
 

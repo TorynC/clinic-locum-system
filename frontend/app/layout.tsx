@@ -1,15 +1,16 @@
-import type React from "react"
-import { Inter } from "next/font/google"
-import "./globals.css"
-import { ThemeProvider } from "@/components/theme-provider"
+import type React from "react";
+import { Inter } from "next/font/google";
+import "./globals.css";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "sonner";
 
-const inter = Inter({ subsets: ["latin"] })
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata = {
   title: "LocumLah - Clinic Booking System",
   description: "Connect clinics with freelance doctors for locum positions",
-    generator: 'v0.dev'
-}
+  generator: "v0.dev",
+};
 
 export const viewport = {
   width: "device-width",
@@ -17,20 +18,26 @@ export const viewport = {
   maximumScale: 1,
   userScalable: false,
   themeColor: "#7c3aed",
-}
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          enableSystem
+          disableTransitionOnChange
+        >
           {children}
+          <Toaster position="top-right" richColors />
         </ThemeProvider>
       </body>
     </html>
-  )
+  );
 }

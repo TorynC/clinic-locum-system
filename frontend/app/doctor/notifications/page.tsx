@@ -4,10 +4,12 @@ import React, { useEffect, useRef, useState } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import { Bell, CheckCircle, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useRouter } from "next/navigation";
 
 const DoctorNotificationsPage = () => {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const doctorId =
     typeof window !== "undefined" ? localStorage.getItem("doctorId") : null;
@@ -37,7 +39,6 @@ const DoctorNotificationsPage = () => {
       setLoading(false);
     }
   };
-
 
   useEffect(() => {
     if (!doctorId) return;
@@ -81,7 +82,7 @@ const DoctorNotificationsPage = () => {
           {notifications.map((n) => (
             <div
               key={n.id}
-              className={`p-4 rounded border flex items-start gap-3 cursor-pointer hover:bg-blue-200 ${
+              className={`p-4 rounded border flex items-start gap-3 ${
                 n.is_read ? "bg-white" : "bg-purple-50 border-purple-200"
               }`}
               onClick={() => markAsRead(n.id)}
@@ -107,18 +108,29 @@ const DoctorNotificationsPage = () => {
                     </Badge>
                   )}
                   {!n.is_read && (
-                  <Badge
-                    variant="default"
-                    className="bg-slate-700 text-white"
-                  >
-                    Mark as Read?
-                  </Badge>
-                )}
+                    <Badge
+                      variant="default"
+                      className="bg-slate-700 text-white"
+                    >
+                      Mark as Read?
+                    </Badge>
+                  )}
                 </div>
                 <div className="text-sm text-gray-700">{n.message}</div>
                 <div className="text-xs text-gray-400 mt-1">
                   {new Date(n.created_at).toLocaleString()}
                 </div>
+                {n.job_id && (
+                  <button
+                    className="mt-2 px-3 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 text-xs"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/doctor/jobs/${n.job_id}`);
+                    }}
+                  >
+                    View Job Details
+                  </button>
+                )}
               </div>
             </div>
           ))}

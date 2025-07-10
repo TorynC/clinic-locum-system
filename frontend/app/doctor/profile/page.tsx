@@ -2,6 +2,7 @@
 
 import { use, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import PhoneInput from "react-phone-number-input";
 import {
   Card,
   CardContent,
@@ -14,28 +15,17 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Upload, X, Plus, VerifiedIcon } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
-import { profile } from "console";
-import { title } from "process";
-import { Span } from "next/dist/trace";
+import { CheckCircle, Upload, X, Plus } from "lucide-react";
 import axiosInstance from "@/utils/axiosinstance";
-import { setDate } from "date-fns";
-
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function DoctorProfilePage() {
-  const [skills, setSkills] = useState([
-    "IM Injection",
-    "Suturing",
-    "Wound Care",
-    "Venipuncture",
-    "ECG",
-  ]);
-  const [languages, setLanguages] = useState(["English", "Malay"]);
-  const [verified, setVerified] = useState(false);
+  const [skills, setSkills] = useState([""]);
+  const [languages, setLanguages] = useState([""]);
+  const [isSaving, setIsSaving] = useState(false);
   const [mmcNumber, setMmcNumber] = useState("");
   const [apcNumber, setApcNumber] = useState("");
-  const [specialization, setSpecialization] = useState("");
   const [experienceYears, setExperienceYears] = useState(0);
   const [bio, setBio] = useState("");
   const [name, setName] = useState("");
@@ -50,14 +40,12 @@ export default function DoctorProfilePage() {
   const [birthday, setBirthday] = useState("");
   const [minimumPay, setMinimumPay] = useState(0);
   const [preferredDays, setPreferredDays] = useState<String[]>([]);
-  const [earliestStart, setEarliestStart] = useState("");
-  const [latestEnd, setLatestEnd] = useState("");
+  const [earliestStart, setEarliestStart] = useState("09:00");
+  const [latestEnd, setLatestEnd] = useState("18:00");
   const [maxDistance, setMaxDistance] = useState(0);
-  const [emailNotif, setEmailNotif] = useState(false);
-  const [SMSNotif, setSMSNotif] = useState(false);
+  const [bankName, setBankName] = useState("");
   const [doctorId, setDoctorId] = useState<string | null>(null);
-  
-
+  const router = useRouter();
   type Experience = {
     id: number;
     title: string;
@@ -77,162 +65,219 @@ export default function DoctorProfilePage() {
   const [profilepic, setProfilepic] = useState<File | null>(null);
   const [apcFile, setApcFile] = useState<File | null>(null);
   const [apcFileUrl, setApcFileUrl] = useState<string | null>(null);
-  const [newSkill, setNewSkill] = useState("");
-  const [newLanguage, setNewLanguage] = useState("");
   const [profilePicUrl, setProfilePicUrl] = useState<string | null>(null);
 
-  // function to save profile changes 
-  const handleProfileChanges = async () => {
-  try {
-    const formData = new FormData();
-    formData.append("skills", JSON.stringify(skills));
-    formData.append("languages", JSON.stringify(languages));
-    formData.append("mmcNumber", mmcNumber);
-    formData.append("apcNumber", apcNumber);
-    formData.append("specialization", specialization);
-    formData.append("experienceYears", experienceYears.toString());
-    formData.append("bio", bio);
-    formData.append("IC", IC);
-    formData.append("address", address);
-    formData.append("city", city);
-    formData.append("state", state);
-    formData.append("postal", postal);
-    formData.append("phone", phone);
-    formData.append("workExperience", JSON.stringify(workExperience));
-    formData.append("gender", gender);
-    formData.append("birthday", birthday);
-    formData.append("minimumPay", minimumPay.toString());
-    formData.append("preferredDays", JSON.stringify(preferredDays));
-    formData.append("earliestStart", earliestStart);
-    formData.append("latestEnd", latestEnd);
-    formData.append("maxDistance", maxDistance.toString());
-    formData.append("emailNotif", emailNotif ? "true" : "false");
-    formData.append("SMSNotif", SMSNotif ? "true" : "false");
-    formData.append("verified", verified ? "true" : "false");
-    formData.append("bank", bank);
-    const token = localStorage.getItem("doctorAccessToken");
-    if (profilepic) formData.append("profilepic", profilepic);
-    if (mmcFile) formData.append("mmcFile", mmcFile);
-    if (apcFile) formData.append("apcFile", apcFile);
-    
-    
-    await axiosInstance.patch(`/doctor-profile/${doctorId}`, formData, {
-      
-      headers: {
-        "Content-Type": "multipart/form-data",
-        ...(token && { Authorization: `Bearer ${token}` }),
-      },
-    });
-    console.log("Profile updated successfully");
-      } catch (error) {
-        console.error(error);
-      }
-    };
+  // function to validate profile information
+  const validateInfo = () => {
+    if (
+      !name ||
+      name.trim() === "" ||
+      !IC ||
+      IC.trim() === "" ||
+      !address ||
+      address.trim() === "" ||
+      !city ||
+      city.trim() === "" ||
+      !state ||
+      state.trim() === "" ||
+      !postal ||
+      postal.trim() === "" ||
+      !phone ||
+      phone.trim() === "" ||
+      !email ||
+      email.trim() === "" ||
+      !gender ||
+      gender.trim() === "" ||
+      !birthday ||
+      !bankName ||
+      bankName.trim() === "" ||
+      !bank ||
+      bank.trim() === "" ||
+      !mmcNumber ||
+      mmcNumber.trim() === "" ||
+      !apcNumber ||
+      apcNumber.trim() === "" ||
+      !experienceYears ||
+      (!mmcFile && !mmcFileUrl) ||
+      (!apcFile && !apcFileUrl)
+    ) {
+      toast.error("Please fill in all required fields (marked with *)");
+      return false;
+    }
+    return true;
+  };
 
-  const getName = async() => {
+  // function to save profile changes
+  const handleProfileChanges = async () => {
+    setIsSaving(true);
+    try {
+      const formData = new FormData();
+      formData.append("skills", JSON.stringify(skills));
+      formData.append("languages", JSON.stringify(languages));
+      formData.append("mmcNumber", mmcNumber);
+      formData.append("apcNumber", apcNumber);
+      formData.append("experienceYears", experienceYears.toString());
+      formData.append("bio", bio);
+      formData.append("IC", IC);
+      formData.append("address", address);
+      formData.append("city", city);
+      formData.append("state", state);
+      formData.append("postal", postal);
+      formData.append("phone", phone);
+      formData.append("workExperience", JSON.stringify(workExperience));
+      formData.append("gender", gender);
+      formData.append("birthday", birthday);
+      formData.append("minimumPay", minimumPay.toString());
+      formData.append("preferredDays", JSON.stringify(preferredDays));
+      formData.append("earliestStart", earliestStart);
+      formData.append("latestEnd", latestEnd);
+      formData.append("maxDistance", maxDistance.toString());
+      formData.append("bank", bank);
+      formData.append("bankName", bankName);
+      const token = localStorage.getItem("doctorAccessToken");
+      // Only append file if a new file is selected
+      if (profilepic) formData.append("profilepic", profilepic);
+      if (mmcFile) formData.append("mmcFile", mmcFile);
+      if (apcFile) formData.append("apcFile", apcFile);
+
+      const response = await axiosInstance.patch(
+        `/doctor-profile/${doctorId}`,
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            ...(token && { Authorization: `Bearer ${token}` }),
+          },
+        }
+      );
+      toast.success("Profile updated successfully");
+      // Always refresh profile after save to get latest file URLs and data
+      await getProfile();
+      // Only clear file state if a new file was uploaded
+      if (profilepic) setProfilepic(null);
+      if (mmcFile) setMmcFile(null);
+      if (apcFile) setApcFile(null);
+    } catch (error) {
+      toast.error("Failed to update profile. Please try again.");
+      console.error(error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const getName = async () => {
+    const token = localStorage.getItem("doctorAccessToken");
+    try {
+      const response = await axiosInstance.get(`/get-doctor/${doctorId}`, {
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+      if (!response.data.error) {
+        setEmail(response.data.doctor.email);
+        setName(response.data.doctor.name);
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const getProfile = async () => {
     const token = localStorage.getItem("doctorAccessToken");
     try {
       const response = await axiosInstance.get(
-        `/get-doctor/${doctorId}`,
+        `/get-doctor-profile/${doctorId}`,
         {
           headers: {
             ...(token && { Authorization: `Bearer ${token}` }),
-          }
+          },
         }
       );
       if (!response.data.error) {
-        setEmail(response.data.doctor.email)
-        setName(response.data.doctor.name)
+        console.log("profile retrieved successfully");
+        setProfilePicUrl(response.data.results?.profile_pic ?? null);
+        setIC(response.data.results?.ic || "");
+        setAddress(response.data.results?.address || "");
+        setBank(response.data.results?.bank_number ?? 0);
+        setCity(response.data.results?.city ?? "");
+        setState(response.data.results?.state ?? "");
+        setPostal(response.data.results?.postal ?? "");
+        setPhone(response.data.results?.phone ?? "");
+        setGender(response.data.results?.gender ?? "");
+
+        let formattedBirthday = "";
+        if (response.data.results?.birthday) {
+          const utcDate = new Date(response.data.results?.birthday);
+          const malaysianDate = new Date(utcDate.getTime() + 28800000);
+          formattedBirthday = malaysianDate.toISOString().slice(0, 10);
+          setBirthday(formattedBirthday);
+        }
+
+        setMmcNumber(response.data.results?.mmc_number ?? "");
+        setApcNumber(response.data.results?.apc_number ?? "");
+        setExperienceYears(response.data.results?.experience_years ?? 0);
+        setBio(response.data.results?.bio ?? "");
+        setLanguages(response.data.results?.languages ?? []);
+        setSkills(response.data.results?.skills ?? []);
+        setMinimumPay(response.data.results?.minimum_pay ?? 0);
+        setPreferredDays(response.data.results?.preferred_days ?? []);
+        setEarliestStart(response.data.results?.earliest_start ?? "09:00");
+        setLatestEnd(response.data.results?.latest_end ?? "18:00");
+        setMaxDistance(response.data.results?.max_distance ?? 0);
+        setBankName(response.data.results?.bank_name ?? "");
+        if (response.data.results?.mmc_file) {
+          setMmcFileUrl(response.data.results.mmc_file);
+        }
+        if (response.data.results?.apc_file) {
+          setApcFileUrl(response.data.results.apc_file);
+        }
+        setWorkExperience(response.data.results?.work_experience ?? []);
       }
     } catch (error) {
       console.error(error);
     }
-  }
-
-  const getProfile = async() => {
-    const token = localStorage.getItem("doctorAccessToken");
-    try {
-      const response = await axiosInstance.get(`/get-doctor-profile/${doctorId}`, {
-          headers: {
-            ...(token && { Authorization: `Bearer ${token}` }),
-          }
-        })
-        if (!response.data.error) {
-          console.log("profile retrieved successfully");
-          setProfilePicUrl(response.data.results?.profile_pic ?? null);
-          setIC(response.data.results?.ic || "");
-          setAddress(response.data.results?.address || "");
-          setBank(response.data.results?.bank_number ?? 0);
-          setCity(response.data.results?.city ?? "");
-          setState(response.data.results?.state ?? "");
-          setPostal(response.data.results?.postal ?? "");
-          setPhone(response.data.results?.phone ?? "");
-          setGender(response.data.results?.gender ?? "");
-
-          let formattedBirthday = "";
-          if (response.data.results?.birthday) {
-            const utcDate = new Date(response.data.results?.birthday)
-            const malaysianDate = new Date(utcDate.getTime() + 28800000)
-            formattedBirthday = malaysianDate.toISOString().slice(0, 10);
-            setBirthday(formattedBirthday);
-          }
-          
-          setVerified(response.data.results?.verified ?? "");
-          setMmcNumber(response.data.results?.mmc_number ?? "");
-          setApcNumber(response.data.results?.apc_number ?? "");
-          setSpecialization(response.data.results?.specialization ?? "");
-          setExperienceYears(response.data.results?.experience_years ?? 0);
-          setBio(response.data.results?.bio ?? "");
-          setLanguages(response.data.results?.languages ?? []);
-          setSkills(response.data.results?.skills ?? []);
-          setMinimumPay(response.data.results?.minimum_pay ?? 0);
-          setPreferredDays(response.data.results?.preferred_days ?? "");
-          setEarliestStart(response.data.results?.earliest_start ?? "");
-          setLatestEnd(response.data.results?.latest_end ?? "");
-          setMaxDistance(response.data.results?.max_distance ?? 0);
-          setSMSNotif(response.data.results?.sms_notif ?? false);
-          setEmailNotif(response.data.results?.email_notif ?? false);
-          setMmcFileUrl(response.data.results?.mmc_file ?? null);
-          setApcFileUrl(response.data.results?.apc_file ?? null);
-          setWorkExperience(response.data.results?.work_experience ?? []);
-        }
-    } catch (error) {
-      console.error(error);
-    }
-  }
+  };
 
   // function to save name
   const handleSaveName = async () => {
     const token = localStorage.getItem("doctorAccessToken");
     try {
-      await axiosInstance.patch(`/doctor-info/${doctorId}`, {
-        name: name
-      }, {
+      await axiosInstance.patch(
+        `/doctor-info/${doctorId}`,
+        {
+          name: name,
+        },
+        {
           headers: {
             ...(token && { Authorization: `Bearer ${token}` }),
-          }
-        })
+          },
+        }
+      );
       console.log("success");
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  }
+  };
   // function to save email
   const handleSaveEmail = async () => {
     const token = localStorage.getItem("doctorAccessToken");
     try {
-      await axiosInstance.patch(`/doctor-info/${doctorId}`, {
-        email: email
-      },{
+      await axiosInstance.patch(
+        `/doctor-info/${doctorId}`,
+        {
+          email: email,
+        },
+        {
           headers: {
             ...(token && { Authorization: `Bearer ${token}` }),
-          }
-        })
+          },
+        }
+      );
       console.log("success");
     } catch (error) {
-      console.error(error)
+      console.error(error);
     }
-  } 
+  };
 
   function handleMmcChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
@@ -243,7 +288,8 @@ export default function DoctorProfilePage() {
 
   function handleApcChange(e: React.ChangeEvent<HTMLInputElement>) {
     if (e.target.files && e.target.files[0]) {
-      setApcFile(e.target.files[0])
+      setApcFile(e.target.files[0]);
+      setApcFileUrl(null);
     }
   }
 
@@ -276,48 +322,32 @@ export default function DoctorProfilePage() {
   const deleteExperience = (id: number) => {
     setWorkExperience(workExperience.filter((exp) => exp.id !== id));
   };
-  
-  const addSkill = (skill: string) => {
-    setSkills([...skills, skill])
-  }
-
-  const removeSkill = (skill: string) => {
-    setSkills(skills.filter((s) => s !== skill));
-  };
-
-  const addLanguage = (language: string) => {
-    setLanguages([...languages, language])
-  }
-
-  const removeLanguage = (language: string) => {
-    setLanguages(languages.filter((l) => l !== language));
-  };
 
   useEffect(() => {
     const storedId = localStorage.getItem("doctorId");
     if (storedId) {
-      setDoctorId(storedId)
+      setDoctorId(storedId);
     }
   }, []);
 
   useEffect(() => {
-      if (doctorId) {
-        getName();
-        getProfile();
-      };
-    }, [doctorId])
+    if (doctorId) {
+      getName();
+      getProfile();
+    }
+  }, [doctorId]);
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-purple-900">Doctor Profile</h1>
+          <h1 className="text-3xl font-bold text-black">Doctor Profile</h1>
           <p className="text-gray-500">
             Manage your personal and professional information
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          {verified && (
+          {/*verified && (
             <Badge
               variant="outline"
               className="bg-green-50 text-green-700 border-green-200 flex items-center gap-1"
@@ -325,27 +355,34 @@ export default function DoctorProfilePage() {
               <CheckCircle className="h-3.5 w-3.5" />
               Verified
             </Badge>
-          )}
-          <Button className="bg-purple-gradient hover:bg-purple-700" onClick={() => {
-            handleProfileChanges();
-            handleSaveEmail();
-            handleSaveName();
-          }}>
-            Save Changes
+          )*/}
+          <Button
+            className="bg-blue-500 hover:bg-blue-700"
+            disabled={isSaving}
+            onClick={async () => {
+              if (validateInfo()) {
+                await handleProfileChanges();
+                await handleSaveEmail();
+                await handleSaveName();
+                router.push("/doctor")
+              }
+            }}
+          >
+            {isSaving ? "Saving..." : "Save Changes"}
           </Button>
         </div>
       </div>
 
       <div className="grid gap-6 md:grid-cols-3">
-        <Card className="border-purple-100 md:col-span-1">
+        <Card className="border-blue-100 md:col-span-1">
           <CardHeader>
-            <CardTitle className="text-purple-900">Profile Photo</CardTitle>
+            <CardTitle className="text-black">Profile Photo</CardTitle>
             <CardDescription>Upload your professional photo</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex flex-col items-center justify-center">
               <div className="relative">
-                <div className="w-32 h-32 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 text-4xl font-medium">
+                <div className="w-32 h-32 rounded-full bg-slate-100 flex items-center justify-center text-blue-600 text-4xl font-medium">
                   {profilepic ? (
                     <img
                       className="rounded-full w-30 h-30 border-none"
@@ -354,15 +391,18 @@ export default function DoctorProfilePage() {
                     />
                   ) : profilePicUrl ? (
                     <img
-                        className="rounded-full w-32 h-32 object-cover border-none"
-                        src={`http://localhost:5000/${profilePicUrl.replace(/\\/g, "/")}`}
-                        alt="Profile"
-                      />
-                    ) : (
-                      <span>
-                        {/* Optionally, show initials or a placeholder */}
-                        <span className="text-4xl text-purple-400">?</span>
-                      </span>
+                      className="rounded-full w-32 h-32 object-cover border-none"
+                      src={`http://localhost:5000/${profilePicUrl.replace(
+                        /\\/g,
+                        "/"
+                      )}`}
+                      alt="Profile"
+                    />
+                  ) : (
+                    <span>
+                      {/* Optionally, show initials or a placeholder */}
+                      <span className="text-4xl text-blue-400">?</span>
+                    </span>
                   )}
                 </div>
                 <input
@@ -371,12 +411,13 @@ export default function DoctorProfilePage() {
                   accept="image/*"
                   className="hidden"
                   onChange={handlePicChange}
+                  disabled={isSaving}
                 />
                 <label htmlFor="profile-pic-upload">
                   <Button
                     size="icon"
                     variant="outline"
-                    className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-white border-purple-200 cursor-pointer"
+                    className="absolute bottom-0 right-0 rounded-full h-8 w-8 bg-white border-blue-200 cursor-pointer"
                     asChild
                   >
                     <span>
@@ -389,38 +430,18 @@ export default function DoctorProfilePage() {
                 Upload a professional photo. It will be visible to clinics.
               </p>
             </div>
-
-            <div className="space-y-2 pt-4">
-              <Label htmlFor="verification-status">Verification Status</Label>
-              <div className="flex items-center space-x-2">
-                <Switch
-                  id="verification-status"
-                  checked={verified}
-                  onCheckedChange={setVerified}
-                />
-                <Label htmlFor="verification-status">
-                  {verified ? "Verified Account" : "Pending Verification"}
-                </Label>
-              </div>
-              <p className="text-xs text-gray-500">
-                {verified ? "Your account has been verified by our team. This increases your chances of being hired." : 
-                "Your account has not been verified yet"}
-              </p>
-            </div>
           </CardContent>
         </Card>
 
-        <Card className="border-purple-100 md:col-span-2">
+        <Card className="border-blue-100 md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-purple-900">
-              Personal Information
-            </CardTitle>
+            <CardTitle className="text-black">Personal Information</CardTitle>
             <CardDescription>Your basic personal details</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="full-name">Full Name</Label>
+                <Label htmlFor="full-name">Full Name *</Label>
                 <Input
                   id="full-name"
                   value={name}
@@ -430,7 +451,7 @@ export default function DoctorProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="ic-number">IC Number</Label>
+                <Label htmlFor="ic-number">IC Number *</Label>
                 <Input
                   id="ic-number"
                   value={IC}
@@ -442,7 +463,7 @@ export default function DoctorProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
+              <Label htmlFor="address">Address *</Label>
               <Input
                 id="address"
                 value={address}
@@ -451,20 +472,10 @@ export default function DoctorProfilePage() {
                 }}
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="bank-number">Bank Account Number</Label>
-              <Input
-                id="bank"
-                type="number"
-                value={bank}
-                onChange={(e) => {
-                  setBank(e.target.value);
-                }}
-              />
-            </div>
+
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="city">City</Label>
+                <Label htmlFor="city">City *</Label>
                 <Input
                   id="city"
                   value={city}
@@ -474,7 +485,7 @@ export default function DoctorProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="state">State</Label>
+                <Label htmlFor="state">State *</Label>
                 <Input
                   id="state"
                   value={state}
@@ -484,7 +495,7 @@ export default function DoctorProfilePage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="postal-code">Postal Code</Label>
+                <Label htmlFor="postal-code">Postal Code *</Label>
                 <Input
                   id="postal-code"
                   value={postal}
@@ -497,18 +508,22 @@ export default function DoctorProfilePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                  }}
-                />
+                <Label htmlFor="phone">Phone Number *</Label>
+                <PhoneInput
+                    id="phone"
+                    international
+                    defaultCountry="MY"
+                    value={phone}
+                    onChange={(value) => setPhone(value || "")}
+                    country="MY"
+                    limitMaxLength
+                    className="w-full rounded-md border border-input px-3 py-2 text-sm"
+                    placeholder="60123456789"
+                  />
               </div>
+              
               <div className="space-y-2">
-                <Label htmlFor="email">Email Address</Label>
+                <Label htmlFor="email">Email Address *</Label>
                 <Input
                   id="email"
                   type="email"
@@ -522,7 +537,7 @@ export default function DoctorProfilePage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="gender">Gender</Label>
+                <Label htmlFor="gender">Gender *</Label>
                 <select
                   id="gender"
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -538,7 +553,7 @@ export default function DoctorProfilePage() {
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="dob">Date of Birth</Label>
+                <Label htmlFor="dob">Date of Birth *</Label>
                 <Input
                   id="dob"
                   type="date"
@@ -549,21 +564,44 @@ export default function DoctorProfilePage() {
                 />
               </div>
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bank-name">Bank Name *</Label>
+              <Input
+                id="bank-name"
+                value={bankName}
+                onChange={(e) => {
+                  setBankName(e.target.value);
+                }}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bank-number">Bank Account Number *</Label>
+              <Input
+                id="bank"
+                type="number"
+                value={bank}
+                onChange={(e) => {
+                  setBank(e.target.value);
+                }}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>
 
       <Tabs defaultValue="professional">
-        <TabsList className="grid w-full grid-cols-3 max-w-md bg-purple-100 text-purple-600">
+        <TabsList className="grid w-full grid-cols-3 max-w-md bg-blue-100 text-blue-600">
           <TabsTrigger value="professional">Professional</TabsTrigger>
           <TabsTrigger value="skills">Skills & Languages</TabsTrigger>
           <TabsTrigger value="preferences">Preferences</TabsTrigger>
         </TabsList>
 
         <TabsContent value="professional" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">
+              <CardTitle className="text-black">
                 Professional Information
               </CardTitle>
               <CardDescription>
@@ -573,7 +611,7 @@ export default function DoctorProfilePage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="mmc-number">MMC Number</Label>
+                  <Label htmlFor="mmc-number">MMC Number *</Label>
                   <Input
                     id="mmc-number"
                     value={mmcNumber}
@@ -583,7 +621,7 @@ export default function DoctorProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="apc-number">APC Number</Label>
+                  <Label htmlFor="apc-number">APC Number *</Label>
                   <Input
                     id="apc-number"
                     value={apcNumber}
@@ -595,33 +633,55 @@ export default function DoctorProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>MMC Certificate</Label>
-                <div className="border border-dashed border-purple-200 rounded-md p-4 bg-purple-50">
+                <Label>MMC Certificate *</Label>
+                <div className="border border-dashed border-blue-200 rounded-md p-4 bg-blue-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                        <label htmlFor="mmc-upload" className="p-2 bg-purple-50 rounded-md cursor-pointer hover:bg-purple-100">
-                            <Upload className="h-5 w-5 text-purple-600" />
-                        </label>
-                        
-                        <input id="mmc-upload" type="file" onChange={handleMmcChange} accept=".pdf" className="hidden"/>
-                        {mmcFile && <span className="text-sm text-gray-700">{mmcFile.name}</span>}
-                        
-                        {!mmcFile && mmcFileUrl && (
-                          <a
-                            href={`http://localhost:5000/${mmcFileUrl.replace(/\\/g, "/")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-700 underline"
-                            download
-                          >
-                            {mmcFileUrl.split("\\")[1]}
-                          </a>
-                        )}
+                      <label
+                        htmlFor="mmc-upload"
+                        className="p-2 bg-blue-50 rounded-md cursor-pointer hover:bg-blue-100"
+                      >
+                        <Upload className="h-5 w-5 text-blue-600" />
+                      </label>
+
+                      <input
+                        id="mmc-upload"
+                        type="file"
+                        onChange={handleMmcChange}
+                        accept=".pdf"
+                        className="hidden"
+                        disabled={isSaving}
+                      />
+                      {mmcFile && (
+                        <span className="text-sm text-gray-700">
+                          {mmcFile.name}
+                        </span>
+                      )}
+
+                      {!mmcFile && mmcFileUrl && (
+                        <a
+                          href={`http://localhost:5000/${mmcFileUrl.replace(
+                            /\\/g,
+                            "/"
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 underline"
+                          download
+                        >
+                          {mmcFileUrl.split("\\")[1]}
+                        </a>
+                      )}
                     </div>
-                    <Button variant="ghost" size="sm" className="text-gray-500" onClick={() => {
-                      setMmcFile(null);
-                      setMmcFileUrl(null);
-                      }}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-500"
+                      onClick={() => {
+                        setMmcFile(null);
+                        setMmcFileUrl(null);
+                      }}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -629,31 +689,53 @@ export default function DoctorProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label>APC Certificate</Label>
-                <div className="border border-dashed border-purple-200 rounded-md p-4 bg-purple-50">
+                <Label>APC Certificate *</Label>
+                <div className="border border-dashed border-blue-200 rounded-md p-4 bg-blue-50">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
-                        <label htmlFor="apc-upload" className="p-2 bg-purple-50 rounded-md cursor-pointer hover:bg-purple-100">
-                          <Upload className="h-5 w-5 text-purple-600" />
-                        </label>
-                        <input id="apc-upload" className="hidden" type="file" onChange={handleApcChange} accept=".pdf" />
-                        {apcFile && <span className="text-sm text-gray-700">{apcFile.name}</span>}
-                        {!apcFile && apcFileUrl && (
-                          <a 
-                            href={`http://localhost:5000/${apcFileUrl.replace(/\\/g, "/")}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-purple-700 underline"
-                            download
-                          >
-                            {apcFileUrl.split("\\")[1]}
-                          </a>
-                        )}
+                      <label
+                        htmlFor="apc-upload"
+                        className="p-2 bg-blue-50 rounded-md cursor-pointer hover:bg-blue-100"
+                      >
+                        <Upload className="h-5 w-5 text-blue-600" />
+                      </label>
+                      <input
+                        id="apc-upload"
+                        className="hidden"
+                        type="file"
+                        onChange={handleApcChange}
+                        accept=".pdf"
+                        disabled={isSaving}
+                      />
+                      {apcFile && (
+                        <span className="text-sm text-gray-700">
+                          {apcFile.name}
+                        </span>
+                      )}
+                      {!apcFile && apcFileUrl && (
+                        <a
+                          href={`http://localhost:5000/${apcFileUrl.replace(
+                            /\\/g,
+                            "/"
+                          )}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-700 underline"
+                          download
+                        >
+                          {apcFileUrl.split("\\")[1]}
+                        </a>
+                      )}
                     </div>
-                    <Button variant="ghost" size="sm" className="text-gray-500" onClick={() => {
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-gray-500"
+                      onClick={() => {
                         setApcFile(null);
                         setApcFileUrl(null);
-                      }}>
+                      }}
+                    >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
@@ -661,26 +743,7 @@ export default function DoctorProfilePage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="specialization">Specialization</Label>
-                <select
-                  id="specialization"
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  value={specialization}
-                  onChange={(e) => {
-                    setSpecialization(e.target.value);
-                  }}
-                >
-                  <option value="">Select Your Specialization</option>
-                  <option value="General Practice">General Practice</option>
-                  <option value="Pediatrics">Pediatrics</option>
-                  <option value="Dental">Dental</option>
-                  <option value="Emergency Medicine">Emergency Medicine</option>
-                  <option value="Surgery">Surgery</option>
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="experience">Years of Experience</Label>
+                <Label htmlFor="experience">Years of Experience *</Label>
                 <Input
                   id="experience"
                   type="number"
@@ -713,7 +776,7 @@ export default function DoctorProfilePage() {
                       type="submit"
                       variant="outline"
                       size="sm"
-                      className="gap-1 border-purple-200 text-purple-700"
+                      className="gap-1 border-blue-200 text-blue-700"
                     >
                       <Plus className="h-4 w-4" />
                       Add Experience
@@ -721,7 +784,7 @@ export default function DoctorProfilePage() {
                   </div>
 
                   <div className="space-y-4 mt-2">
-                    <div className="p-4 border border-purple-100 rounded-lg bg-purple-50">
+                    <div className="p-4 border border-blue-100 rounded-lg bg-blue-50">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="space-y-2">
@@ -803,7 +866,7 @@ export default function DoctorProfilePage() {
 
                 {workExperience.map((exp) => (
                   <div className="space-y-4" key={exp.id}>
-                    <div className="flex flex-col md:flex-row md:items-start  gap-4 p-4 border border-purple-100 rounded-lg bg-purple-50">
+                    <div className="flex flex-col md:flex-row md:items-start  gap-4 p-4 border border-blue-100 rounded-lg bg-blue-50">
                       <div className="flex-1 space-y-2">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
@@ -853,116 +916,79 @@ export default function DoctorProfilePage() {
         </TabsContent>
 
         <TabsContent value="skills" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">
-                Skills & Languages
-              </CardTitle>
+              <CardTitle className="text-black">Skills & Languages</CardTitle>
               <CardDescription>
                 Your medical skills and languages spoken
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Medical Skills & Procedures</Label>
-                  <div className="flex items-center gap-2 ml-auto">
-                    
-                    <Input className=" w-40" value={newSkill} onChange={(e) => {setNewSkill(e.target.value)}}></Input>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 border-purple-200 text-purple-700"
-                      onClick={() => {
-                        addSkill(newSkill.trim());
-                        setNewSkill("");
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      
-                    </Button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {skills.map((skill) => (
-                    <Badge
-                      key={skill}
-                      variant="secondary"
-                      className="pl-3 pr-2 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200"
-                    >
-                      {skill}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 ml-1 text-purple-700 hover:text-purple-900 hover:bg-transparent"
-                        onClick={() => removeSkill(skill)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
+                <Label>Medical Skills & Procedures</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                  "Antenatal Care",
+                  "Ultrasound",
+                  "Surgical Procedure",
+                  "Sexual Health",
+                  "Paeds Care",
+                ].map((skill) => (
+                    <div key={skill} className="flex items-center space-x-2 ">
+                      <input
+                        type="checkbox"
+                        id={`skill-${skill}`}
+                        className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                        checked={skills.includes(skill)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSkills([...skills, skill]);
+                          } else {
+                            setSkills(skills.filter((q) => q !== skill));
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`skill-${skill}`}>{skill}</Label>
+                    </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">
-                  Add all medical procedures and skills you are proficient in.
-                  This helps clinics find you for specific needs.
-                </p>
               </div>
-
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <Label>Languages Spoken</Label>
-                  <div className="flex items-center gap-2 ml-auto">
-                    
-                    <Input className=" w-40" value={newLanguage} onChange={(e) => {setNewLanguage(e.target.value)}}></Input>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-1 border-purple-200 text-purple-700"
-                      onClick={() => {
-                        newLanguage.trim();
-                        addLanguage(newLanguage);
-                        setNewLanguage("");
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                      
-                    </Button>
-                  </div>
-                  
-                  
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {languages.map((language) => (
-                    <Badge
+                <Label>Languages Spoken</Label>
+                <div className="grid grid-cols-2 gap-2 ">
+                  {["Chinese", "Tamil"].map((language) => (
+                    <div
                       key={language}
-                      variant="secondary"
-                      className="pl-3 pr-2 py-1.5 bg-purple-100 text-purple-700 hover:bg-purple-200"
+                      className="flex items-center space-x-2 "
                     >
-                      {language}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-4 w-4 ml-1 text-purple-700 hover:text-purple-900 hover:bg-transparent"
-                        onClick={() => removeLanguage(language)}
-                      >
-                        <X className="h-3 w-3" />
-                      </Button>
-                    </Badge>
+                      <input
+                        type="checkbox"
+                        id={`lang-${language}`}
+                        className="h-4 w-4 rounded border-gray-300 cursor-pointer"
+                        checked={languages.includes(language)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setLanguages([...languages, language]);
+                          } else {
+                            setLanguages(
+                              languages.filter((q) => q !== language)
+                            );
+                          }
+                        }}
+                      />
+                      <Label htmlFor={`lang-${language}`}>{language}</Label>
+                    </div>
                   ))}
                 </div>
-                <p className="text-xs text-gray-500">
-                  Add all languages you can communicate in with patients.
-                  Include your proficiency level if relevant.
-                </p>
               </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="preferences" className="mt-6">
-          <Card className="border-purple-100">
+          <Card className="border-blue-100">
             <CardHeader>
-              <CardTitle className="text-purple-900">Job Preferences</CardTitle>
+              <CardTitle className="text-black">Job Preferences</CardTitle>
               <CardDescription>
                 Set your preferences for locum jobs
               </CardDescription>
@@ -1065,32 +1091,6 @@ export default function DoctorProfilePage() {
                   You will only be shown jobs within this distance from your
                   address.
                 </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label>Notification Preferences (Available in the next update)</Label>
-                <div className="space-y-2">
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="email-notifications"
-                      checked={emailNotif}
-                      onCheckedChange={setEmailNotif}
-                    />
-                    <Label htmlFor="email-notifications">
-                      Email notifications for new matching jobs
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="sms-notifications"
-                      checked={SMSNotif}
-                      onCheckedChange={setSMSNotif}
-                    />
-                    <Label htmlFor="sms-notifications">
-                      SMS notifications for urgent requests
-                    </Label>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>

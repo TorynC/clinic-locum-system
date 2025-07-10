@@ -3,19 +3,10 @@ import React from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Plus,
-  Filter,
-  CalendarIcon,
-} from "lucide-react";
-import Link from "next/link";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { getWeek, isToday } from "date-fns";
-import next from "next";
 import axiosInstance from "@/utils/axiosinstance";
-import { parseISO, setHours, setMinutes, setSeconds } from "date-fns";
+import { formatTimeRange } from "@/utils/timeUtils";
 
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<"month" | "week" | "day">("month");
@@ -25,6 +16,8 @@ export default function CalendarPage() {
   const [jobs, setJobs] = useState<any[]>([]);
   const [clinics, setClinics] = useState<any[]>([]);
   const [doctorId, setDoctorId] = useState<string | null>(null);
+  const [applications, setApplications] = useState<any[]>([]);
+  const [doctors, setDoctors] = useState<any[]>([]);
 
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -47,22 +40,142 @@ export default function CalendarPage() {
     axiosInstance.get("/get-all-clinics").then((res) => {
       if (!res.data.error) setClinics(res.data.clinics);
     });
+    axiosInstance.get(`/get-applications/${doctorId}`).then((res) => {
+      if (!res.data.error) setApplications(res.data.applications);
+    });
+    // Fetch current doctor info
+    axiosInstance.get(`/get-doctor/${doctorId}`).then((res) => {
+      if (!res.data.error) {
+        // Set doctors array with just the current doctor for consistency
+        setDoctors([res.data.doctor]);
+      }
+    });
   }, [doctorId]);
 
-  // Get real calendar days
+  useEffect(() => {
+    if (jobs.length === 0 || doctors.length === 0) return;
+
+    // Get current doctor info
+    const currentDoctor = doctors[0]; // Since we only fetch the current doctor
+
+    // 1. Normal jobs (doctor assigned)
+    const doctorEvents = jobs
+      .filter((job) => job.doctor_id === doctorId)
+      .map((job) => {
+        const utcDate = new Date(job.date);
+        const malaysiaDate = new Date(utcDate.getTime() + 28800000);
+        const [startH, startM, startS] = job.start_time.split(":").map(Number);
+        const [endH, endM, endS] = job.end_time.split(":").map(Number);
+        const start = new Date(malaysiaDate);
+        start.setHours(startH, startM, startS);
+        const end = new Date(malaysiaDate);
+        end.setHours(endH, endM, endS);
+        if (end <= start) end.setDate(end.getDate() + 1);
+        const clinic = clinics.find((c) => c.id === job.clinic_id);
+        return {
+          start,
+          end,
+          status: job.status,
+          id: job.id,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          clinic_name: clinic ? clinic.clinic_name : "Clinic",
+        };
+      });
+
+    // 2. Cancelled jobs (from applications)
+    const cancelledEvents = applications
+      .filter((app) => app.status === "Cancelled")
+      .map((app) => {
+        const job = jobs.find((j) => j.id === app.job_id);
+        if (!job) return null;
+        const utcDate = new Date(job.date);
+        const malaysiaDate = new Date(utcDate.getTime() + 28800000);
+        const [startH, startM, startS] = job.start_time.split(":").map(Number);
+        const [endH, endM, endS] = job.end_time.split(":").map(Number);
+        const start = new Date(malaysiaDate);
+        start.setHours(startH, startM, startS);
+        const end = new Date(malaysiaDate);
+        end.setHours(endH, endM, endS);
+        if (end <= start) end.setDate(end.getDate() + 1);
+        const clinic = clinics.find((c) => c.id === job.clinic_id);
+        return {
+          start,
+          end,
+          status: "Cancelled",
+          id: `${job.id}-cancelled`,
+          start_time: job.start_time,
+          end_time: job.end_time,
+          clinic_name: clinic ? clinic.clinic_name : "Clinic",
+        };
+      })
+      .filter(Boolean);
+
+    setEvents([...doctorEvents, ...cancelledEvents]);
+  }, [jobs, doctors, applications, doctorId]);
+
+  // Get real calendar days with proper weekday alignment
   function getCalendarDays(date: Date) {
     const year = date.getFullYear();
     const month = date.getMonth();
 
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Get the first day of the month and find what day of the week it is
+    const firstDayOfMonth = new Date(year, month, 1);
+    const firstDayWeekday = firstDayOfMonth.getDay(); // 0 = Sunday, 1 = Monday, etc.
 
-    return Array.from({ length: daysInMonth }, (_, i) => {
-      const current = new Date(year, month, i + 1);
-      return {
-        date: current,
-        isToday: isSameDay(current, new Date()),
-      };
-    });
+    // Get the last day of the month
+    const lastDayOfMonth = new Date(year, month + 1, 0);
+    const daysInMonth = lastDayOfMonth.getDate();
+
+    // Calculate how many days we need from the previous month
+    const daysFromPrevMonth = firstDayWeekday;
+
+    // Calculate how many days we need from the next month to fill the grid
+    const totalCells = 42; // 6 weeks × 7 days
+    const daysFromNextMonth = totalCells - daysFromPrevMonth - daysInMonth;
+
+    const calendarDays = [];
+
+    // Add days from previous month
+    if (daysFromPrevMonth > 0) {
+      const prevMonth = new Date(year, month - 1, 1);
+      const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+      for (
+        let i = daysInPrevMonth - daysFromPrevMonth + 1;
+        i <= daysInPrevMonth;
+        i++
+      ) {
+        const dayDate = new Date(year, month - 1, i);
+        calendarDays.push({
+          date: dayDate,
+          isToday: isSameDay(dayDate, new Date()),
+          isCurrentMonth: false,
+        });
+      }
+    }
+
+    // Add days from current month
+    for (let i = 1; i <= daysInMonth; i++) {
+      const dayDate = new Date(year, month, i);
+      calendarDays.push({
+        date: dayDate,
+        isToday: isSameDay(dayDate, new Date()),
+        isCurrentMonth: true,
+      });
+    }
+
+    // Add days from next month
+    for (let i = 1; i <= daysFromNextMonth; i++) {
+      const dayDate = new Date(year, month + 1, i);
+      calendarDays.push({
+        date: dayDate,
+        isToday: isSameDay(dayDate, new Date()),
+        isCurrentMonth: false,
+      });
+    }
+
+    return calendarDays;
   }
 
   function getWeekDays(date: Date) {
@@ -130,17 +243,67 @@ export default function CalendarPage() {
 
   const today = currentDate;
 
+  const cancelledApplications = applications.filter(
+    (app) => app.status === "Cancelled"
+  );
+
+  const cancelledJobs = cancelledApplications
+    .map((app) => jobs.find((job) => job.id === app.job_id))
+    .filter(Boolean); // Remove undefined if job not found
+
   const confirmedJobs = jobs.filter(
     (job) =>
       job.doctor_id === doctorId &&
       (job.status === "Accepted" || job.status === "Completed")
   );
 
-  function getJobColor(status: string) {
-    if (status === "Completed")
-      return "bg-green-100 text-green-900 border border-green-400";
-    // Default to upcoming (Accepted)
-    return "bg-purple-100 text-purple-900 border border-purple-400";
+  // Helper: get events for a specific day (for month view)
+  const getEventsForDay = (day: Date) =>
+    events.filter(
+      (event) =>
+        event.start.getFullYear() === day.getFullYear() &&
+        event.start.getMonth() === day.getMonth() &&
+        event.start.getDate() === day.getDate()
+    );
+
+  // Helper: get events overlapping a specific hour (for week/day view)
+  const getEventsForHour = (date: Date, hour: number) =>
+    events.filter(
+      (event) =>
+        event.start <=
+          new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+            hour,
+            59,
+            59
+          ) &&
+        event.end >
+          new Date(
+            date.getFullYear(),
+            date.getMonth(),
+            date.getDate(),
+            hour,
+            0,
+            0
+          )
+    );
+
+  // Helper: get color for event status
+  function getEventColor(status: string) {
+    switch (status) {
+      case "Completed":
+        return "bg-green-100 border border-green-400 text-green-800";
+      case "Accepted":
+        return "bg-purple-100 border border-purple-400 text-purple-800";
+      case "Urgent":
+        return "bg-red-200 border border-red-400 text-red-800";
+      case "Cancelled":
+        return "bg-red-100 border border-red-400 text-red-800";
+      default:
+        return "bg-gray-100 border border-gray-400 text-gray-800";
+    }
   }
 
   return (
@@ -199,6 +362,7 @@ export default function CalendarPage() {
             </div>
           </div>
 
+          {/* MONTH VIEW */}
           {viewMode === "month" ? (
             <div className="grid grid-cols-7 gap-1">
               {days.map((day) => (
@@ -214,56 +378,39 @@ export default function CalendarPage() {
                   key={i}
                   className={cn(
                     "calendar-day border rounded-md p-1",
-                    !day.date
+                    !day.isCurrentMonth
                       ? "bg-gray-50 text-gray-400"
                       : "hover:bg-blue-50 cursor-pointer",
                     day.isToday && "ring-2 ring-blue-400"
                   )}
                 >
-                  {day.date && (
-                    <>
-                      <div>
-                        <div
-                          className={cn(
-                            "text-right p-1 font-medium",
-                            day.isToday && "text-blue-600"
-                          )}
-                        >
-                          {day.date.getDate()}
+                  <div>
+                    <div
+                      className={cn(
+                        "text-right p-1 font-medium",
+                        day.isToday && "text-blue-600",
+                        !day.isCurrentMonth && "text-gray-400"
+                      )}
+                    >
+                      {day.date.getDate()}
+                    </div>
+                    {/* Render all events for this day */}
+                    {day.isCurrentMonth &&
+                      getEventsForDay(day.date).map((event) => (
+                      <div
+                        key={event.id}
+                        className={cn(
+                          "text-xs truncate rounded p-0.5 flex-col z-0",
+                          getEventColor(event.status)
+                        )}
+                      >
+                        {event.clinic_name}
+                        <div className="text-xs z-10">
+                          {formatTimeRange(event.start_time, event.end_time)}
                         </div>
                       </div>
-                      {/* Render confirmed jobs for this day */}
-                      {confirmedJobs
-                        .filter(
-                          (job) =>
-                            new Date(job.date).toDateString() ===
-                            day.date.toDateString()
-                        )
-                        .map((job) => {
-                          const clinic = clinics.find(
-                            (c) => c.id === job.clinic_id
-                          );
-                          return (
-                            <div
-                              key={job.id}
-                              className={cn(
-                                "mt-1 px-2 py-1 rounded text-xs font-medium flex items-center",
-                                getJobColor(job.status)
-                              )}
-                            >
-                              <span className="truncate">
-                                {clinic?.clinic_name ||
-                                  job.clinic_name ||
-                                  "Clinic"}
-                              </span>
-                              <span className="ml-2">
-                                {job.start_time} - {job.end_time}
-                              </span>
-                            </div>
-                          );
-                        })}
-                    </>
-                  )}
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
@@ -282,7 +429,6 @@ export default function CalendarPage() {
                     {days[day.date.getDay()]} {day.date.getDate()}
                   </div>
                 ))}
-
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-blue-50 text-gray-500 flex flex-col ">
@@ -299,37 +445,24 @@ export default function CalendarPage() {
                         key={i}
                         className="border-r border-b h-25 hover:bg-blue-50 relative truncate p-1 left-1 right-1 top-1 flex-col flex"
                       >
-                        {confirmedJobs
-                          .filter(
-                            (job) =>
-                              new Date(job.date).toDateString() ===
-                                day.date.toDateString() &&
-                              parseInt(job.start_time.split(":")[0], 10) ===
-                                hour
-                          )
-                          .map((job) => {
-                            const clinic = clinics.find(
-                              (c) => c.id === job.clinic_id
-                            );
-                            return (
-                              <div
-                                key={job.id}
-                                className={cn(
-                                  "mb-1 px-2 py-1 rounded text-xs font-medium flex items-center",
-                                  getJobColor(job.status)
-                                )}
-                              >
-                                <span className="truncate">
-                                  {clinic?.clinic_name ||
-                                    job.clinic_name ||
-                                    "Clinic"}
-                                </span>
-                                <span className="ml-2">
-                                  {job.start_time} - {job.end_time}
-                                </span>
-                              </div>
-                            );
-                          })}
+                        {/* Render all events overlapping this hour */}
+                        {getEventsForHour(day.date, hour).map((event) => (
+                          <div
+                            key={event.id}
+                            className={cn(
+                              "text-xs truncate rounded p-0.5 flex-col z-0",
+                              getEventColor(event.status)
+                            )}
+                          >
+                            {event.clinic_name}
+                            <div className="text-xs z-10">
+                              {formatTimeRange(
+                                event.start_time,
+                                event.end_time
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </React.Fragment>
@@ -350,7 +483,6 @@ export default function CalendarPage() {
                     {days[today.getDay()]} {today.getDate()}
                   </div>
                 )}
-
                 {[...Array(24)].map((_, hour) => (
                   <React.Fragment key={hour}>
                     <div className="border-r border-b p-1 text-right pr-2 bg-blue-50 text-gray-500">
@@ -363,36 +495,21 @@ export default function CalendarPage() {
                         : `${hour - 12}PM`}
                     </div>
                     <div className="border-r border-b h-25 hover:bg-blue-50 relative">
-                      {confirmedJobs
-                        .filter(
-                          (job) =>
-                            new Date(job.date).toDateString() ===
-                              today.toDateString() &&
-                            parseInt(job.start_time.split(":")[0], 10) === hour
-                        )
-                        .map((job) => {
-                          const clinic = clinics.find(
-                            (c) => c.id === job.clinic_id
-                          );
-                          return (
-                            <div
-                              key={job.id}
-                              className={cn(
-                                "mb-1 px-2 py-1 rounded text-xs font-medium flex items-center",
-                                getJobColor(job.status)
-                              )}
-                            >
-                              <span className="truncate">
-                                {clinic?.clinic_name ||
-                                  job.clinic_name ||
-                                  "Clinic"}
-                              </span>
-                              <span className="ml-2">
-                                {job.start_time} - {job.end_time}
-                              </span>
-                            </div>
-                          );
-                        })}
+                      {/* Render all events overlapping this hour */}
+                      {getEventsForHour(today, hour).map((event) => (
+                        <div
+                          key={event.id}
+                          className={cn(
+                            "text-xs truncate rounded p-0.5 flex-col z-0",
+                            getEventColor(event.status)
+                          )}
+                        >
+                          {event.clinic_name}
+                          <div className="text-xs z-10">
+                            {formatTimeRange(event.start_time, event.end_time)}
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </React.Fragment>
                 ))}
@@ -412,6 +529,10 @@ export default function CalendarPage() {
           <div className="flex items-center">
             <div className="w-3 h-3 rounded-full bg-green-100 border border-green-400 mr-2"></div>
             <span className="text-sm">Completed</span>
+          </div>
+          <div className="flex items-center">
+            <div className="w-3 h-3 rounded-full bg-red-100 border border-red-400 mr-2"></div>
+            <span className="text-sm">Cancelled</span>
           </div>
         </div>
       </div>

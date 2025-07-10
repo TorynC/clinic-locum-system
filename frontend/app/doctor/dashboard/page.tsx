@@ -1,30 +1,13 @@
 "use client";
 
 import type React from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Search,
-  Download,
-  ArrowUpDown,
-  Calendar,
-  Clock,
-  MapPin,
-  DollarSign,
-  Star,
-  ArrowRight,
-} from "lucide-react";
+import { ArrowUpDown, Calendar, Clock, DollarSign, Star } from "lucide-react";
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
+import { useRouter } from "next/navigation";
 
 export default function DoctorDashboardPage() {
   const [doctorId, setDoctorId] = useState<string | null>(null);
@@ -34,6 +17,7 @@ export default function DoctorDashboardPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [clinicContactInfo, setClinicContactInfo] = useState<any>(null);
   const jobsPerPage = 5;
+  const router = useRouter();
 
   // function to get jobs
   const getAllJobs = async () => {
@@ -203,7 +187,8 @@ export default function DoctorDashboardPage() {
                   <TableHeader>Status</TableHeader>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-purple-100">
+
+              <tbody className="bg-white divide-y divide-purple-100 hover:cursor-pointer">
                 {myJobs
                   .filter((job) => job.status === "Completed")
                   .sort(
@@ -217,6 +202,8 @@ export default function DoctorDashboardPage() {
                       <tr
                         key={job.id}
                         className="hover:bg-blue-100 transition-colors"
+                        onClick={() => router.push(`/doctor/jobs/${job.id}`)}
+                        style={{ cursor: "pointer" }}
                       >
                         <TableCell>
                           {new Date(job.date).toLocaleDateString("en-MY", {

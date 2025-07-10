@@ -171,7 +171,7 @@ export default function EditJobPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="job-id">Existing Job ID</Label>
+              <Label htmlFor="job-id">Existing Job</Label>
               <select
                 id="job-id"
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
@@ -180,12 +180,14 @@ export default function EditJobPage() {
                   setJobId(e.target.value);
                 }}
               >
-                <option value="">Select Existing Job ID</option>
+                <option value="">Select Existing Job</option>
                 {jobs.map(
                   (job) =>
-                    job.id && (
+                    job.date && (
                       <option key={job.id} value={job.id}>
-                        {job.id}
+                        {`Doctor Locum Job on ${new Date(job.date).toLocaleDateString("en-MY", {
+                                  timeZone: "Asia/Kuala_Lumpur",
+                                })} from ${job.start_time} to ${job.end_time} `}
                       </option>
                     )
                 )}

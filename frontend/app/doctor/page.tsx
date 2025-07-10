@@ -15,8 +15,6 @@ import {
   Calendar,
   Clock,
   DollarSign,
-  Star,
-  Bell,
   TrendingUp,
   ArrowRight,
   Search,
@@ -24,6 +22,8 @@ import {
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import axiosInstance from "@/utils/axiosinstance";
+import { formatTimeRange } from "@/utils/timeUtils";
+import { useRouter } from "next/navigation";
 
 // MetricCard component for displaying metrics
 type MetricCardProps = {
@@ -41,6 +41,8 @@ const colorClasses: Record<string, string> = {
   orange: "from-orange-500 to-orange-600",
   rose: "from-rose-500 to-rose-600",
 };
+
+
 
 function MetricCard({
   icon,
@@ -97,6 +99,7 @@ export default function DoctorHomePage() {
   const [clinics, setClinics] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const jobsPerPage = 5;
+  const router = useRouter();
 
   // get name
   const getName = async (id: String) => {
@@ -320,19 +323,23 @@ export default function DoctorHomePage() {
                 .map((job) => {
                   const clinic = clinics.find((c) => c.id === job.clinic_id);
                   return (
+                    
                     <div
                       key={job.id}
                       className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer"
                     >
+                      
                       <div className="w-3 h-3 rounded-full bg-emerald-500 mr-3 sm:mr-4 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
+                          <div className="flex items-center ">
+                            <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
                             {clinic ? clinic.clinic_name : "Clinic"}
                           </p>
-                          <Badge className="status-upcoming ml-2 flex-shrink-0">
+                            <Badge className="status-upcoming ml-2 flex-shrink-0">
                             Confirmed
-                          </Badge>
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs sm:text-sm text-slate-600">
                           <div className="flex items-center">
@@ -346,7 +353,7 @@ export default function DoctorHomePage() {
                           </div>
                           <div className="flex items-center">
                             <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
-                            {job.start_time} - {job.end_time}
+                            {formatTimeRange(job.start_time, job.end_time)}
                           </div>
                           <div className="flex items-center">
                             <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1" />
@@ -361,6 +368,15 @@ export default function DoctorHomePage() {
                         </div>
                       </div>
                       {/* Cancel Button UI */}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-4 text-black border-slate-200 hover:bg-slate-100"
+                        onClick={() => router.push(`/doctor/jobs/${job.id}`)}
+                      >
+                        View Job Details
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -419,13 +435,14 @@ export default function DoctorHomePage() {
                   key={i}
                   className="p-3 sm:p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer group"
                 >
+                  <Link key={job.id} href={`/doctor/jobs/${job.id}`}>
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
                         <p className="font-semibold text-slate-900 text-sm sm:text-base truncate">
                           {clinic ? clinic.clinic_name : ""}
                         </p>
-                        {application?.status === "posted" && (
+                        {application?.status === "Pending" && (
                           <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-xs flex-shrink-0">
                             Pending
                           </Badge>
@@ -436,7 +453,7 @@ export default function DoctorHomePage() {
                           </Badge>
                         )}
                         {application?.status === "Rejected" && (
-                          <Badge className="bg-orange-100 text-orange-700 border-orange-200 text-xs flex-shrink-0">
+                          <Badge className="bg-red-100 text-red-700 border-red-200 text-xs flex-shrink-0">
                             Rejected
                           </Badge>
                         )}
@@ -459,12 +476,17 @@ export default function DoctorHomePage() {
                           <MapPin className="w-3.5 h-3.5 mr-1" />
                           {job.address}
                         </div>
+                        <div className="flex items-center">
+                          <Clock className="w-3.5 h-3.5 mr-1"/>
+                          {formatTimeRange(job.start_time, job.end_time)}
+                        </div>
                       </div>
                     </div>
-                    <Link href={`/doctor/jobs/${job.id}`}>
+                    
                       <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition-colors ml-2 flex-shrink-0" />
-                    </Link>
+                    
                   </div>
+                  </Link>
                 </div>
               );
             })}

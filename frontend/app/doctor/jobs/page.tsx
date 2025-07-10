@@ -19,12 +19,12 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import axiosInstance from "@/utils/axiosinstance";
 import { time } from "console";
+import { formatTimeRange } from "@/utils/timeUtils";
 
 export default function DoctorJobsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedFilters, setSelectedFilters] = useState({
-    specialty: "",
     distance: "",
     date: "",
     rate: "",
@@ -181,9 +181,6 @@ export default function DoctorJobsPage() {
         (jobHour === filterHour && jobMinute <= filterMinute);
     }
 
-    const matchesSpecialty = selectedFilters.specialty
-      ? job.specialty === selectedFilters.specialty
-      : true;
     const matchesDistance = selectedFilters.distance
       ? Number.parseFloat(job.distance) <=
         Number.parseFloat(selectedFilters.distance)
@@ -207,7 +204,6 @@ export default function DoctorJobsPage() {
 
     return (
       matchesSearch &&
-      matchesSpecialty &&
       matchesDistance &&
       matchesRate &&
       matchesDate &&
@@ -220,7 +216,6 @@ export default function DoctorJobsPage() {
 
   const clearFilters = () => {
     setSelectedFilters({
-      specialty: "",
       distance: "",
       date: "",
       rate: "",
@@ -246,7 +241,7 @@ export default function DoctorJobsPage() {
     <div className="space-y-4 pb-20 md:pb-0">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-black-900">
+          <h1 className="text-2xl sm:text-3xl font-bold text-black">
             Browse Jobs
           </h1>
           <p className="text-gray-500">
@@ -260,7 +255,7 @@ export default function DoctorJobsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
           <Input
-            placeholder="Search by clinic, location, or specialty..."
+            placeholder="Search by clinic, location"
             className="pl-8"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -375,7 +370,7 @@ export default function DoctorJobsPage() {
       </div>
 
       {/* Job Listings */}
-      <div className="space-y-3">
+      <div className="space-y-2">
         {filteredJobs.length > 0 ? (
           filteredJobs.map((job) => (
             <Link
@@ -385,98 +380,83 @@ export default function DoctorJobsPage() {
             >
               <Card
                 className={cn(
-                  "rounded-3xl border-0 shadow-medium hover:shadow-strong transition-all duration-300 hover:-translate-y-1 bg-gradient-to-br from-white to-slate-50/50",
+                  "border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5 overflow-hidden bg-white",
                   job.status === "Urgent" && "border-2 border-red-400"
                 )}
               >
-                <CardContent className="p-4">
-                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-md flex-shrink-0">
-                          {clinicNames[job.clinic_id]?.charAt(0)}
+                <CardContent className="p-0">
+                  <div className="flex">
+                    {/* Left Section - Date, Time & Duration */}
+                    <div className="bg-gradient-to-br from-blue-500 to-blue-600 text-white p-3 md:p-4 flex flex-col justify-center items-center text-center min-w-[100px] sm:min-w-[110px] md:min-w-[140px]">
+                      <div className="text-xs md:text-sm font-medium opacity-90 mb-0.5">
+                        {new Date(job.date).toLocaleDateString("en-US", {
+                          timeZone: "Asia/Kuala_Lumpur",
+                          month: "long",
+                        })}
+                      </div>
+                      <div className="text-3xl md:text-4xl font-bold mb-2">
+                        {new Date(job.date).toLocaleDateString("en-US", {
+                          timeZone: "Asia/Kuala_Lumpur",
+                          day: "2-digit",
+                        })}
+                      </div>
+                      <div className="space-y-0.5 mb-2">
+                        <div className="text-xs md:text-sm font-medium">
+                          {
+                            formatTimeRange(job.start_time, job.end_time).split(
+                              "-"
+                            )[0]
+                          }
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <h3 className="font-bold text-xl text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                              Locum Doctor 
-                            </h3>
-                              <h3 className="text-lg text-slate-900 group-hover:text-blue-600 transition-colors truncate">
-                              {clinicNames[job.clinic_id]} 
-                            </h3>
-                            
-                            </div>
-                            
-                            {job.status === "Urgent" && (
-                              <Badge className="bg-red-100 text-red-700 border-red-200 font-semibold animate-pulse">
-                                Urgent
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-base text-slate-600 mt-1">
-                            <div className="flex items-center">
-                              <MapPin className="h-4 w-4 mr-1 text-slate-500" />
-                              {clinicCities[job.clinic_id]}
-                            </div>
-                            <div className="flex items-center">
-                              <Calendar className="h-4 w-4 mr-1 text-slate-500" />
-                              {new Date(job.date).toLocaleDateString("en-MY", {
-                                year: "numeric",
-                                month: "short",
-                                day: "numeric",
-                                timeZone: "Asia/Kuala_Lumpur",
-                              })}
-                            </div>
-                          </div>
+                        <div className="text-xs md:text-sm font-medium opacity-75">
+                          -
+                        </div>
+                        <div className="text-xs md:text-sm font-medium">
+                          {
+                            formatTimeRange(job.start_time, job.end_time).split(
+                              "-"
+                            )[1]
+                          }
                         </div>
                       </div>
+                      <div className="flex items-center justify-center bg-white/20 rounded px-1.5 py-0.5 border border-white/30">
+                        <Clock className="h-2.5 w-2.5 md:h-3 md:w-3 mr-1" />
+                        <span className="text-xs md:text-sm font-bold">
+                          {job.duration} h
+                        </span>
+                      </div>
+                    </div>
 
-                      <div className="flex flex-wrap gap-2 mb-3">
-                        <Badge
-                          className={cn(
-                            "text-sm font-medium border px-3 py-1",
-                            job.gender === "female"
-                              ? "bg-pink-100 text-pink-700 border-pink-200"
-                              : job.gender === "male"
-                              ? "bg-blue-100 text-blue-700 border-pink-200"
-                              : "bg-slate-100 text-slate-700 border-slate-200"
+                    {/* Right Section - Job Details */}
+                    <div className="flex-1 p-2.5 md:p-4 relative">
+                      {/* Header - Clinic Info */}
+                      <div className="mb-2.5 md:mb-3">
+                        <h3 className="text-base md:text-2xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors mb-1.5 md:mb-2">
+                          {clinicNames[job.clinic_id]}
+                        </h3>
+
+                        <div className="flex items-center text-gray-600 mb-2">
+                          <MapPin className="h-3 w-3 md:h-4 md:w-4 mr-1 flex-shrink-0" />
+                          <span className="text-xs md:text-sm mr-2">
+                            {clinicCities[job.clinic_id]}
+                          </span>
+                          {job.status === "Urgent" && (
+                            <Badge className="bg-red-100 text-red-700 border-red-200 font-semibold animate-pulse">
+                              Urgent
+                            </Badge>
                           )}
-                        >
-                          {job.gender === "any"
-                            ? "Any Gender"
-                            : job.gender === "male"
-                            ? "Male Doctor"
-                            : "Female Doctor"}
-                        </Badge>
-
-                        {/* Paid/Unpaid Break Tag */}
-                        {job.paid_break ? (
-                          <Badge className="bg-green-100 text-green-700 border-green-200">
-                            Paid Break
-                          </Badge>
-                        ) : (
-                          <Badge className="bg-red-100 text-red-700 border-red-200">
-                            Unpaid Break
-                          </Badge>
-                        )}
-
-                        {/* Break Time */}
-                        {job.break_start && job.break_end && (
-                          <Badge className="bg-yellow-100 text-yellow-700 border-yellow-200">
-                            Break: {job.break_start} - {job.break_end}
-                          </Badge>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      {/* Procedures Tags - First Row */}
+                      <div className="flex flex-wrap gap-1 md:gap-2 mb-2.5 md:mb-3">
                         {job.procedure
                           .slice(0, 3)
-                          .map((skill: string, i: string) => (
+                          .map((skill: string, i: any) => (
                             <Badge
                               key={i}
                               variant="outline"
-                              className="text-sm bg-slate-50 border-slate-200 text-slate-700 px-3 py-1"
+                              className="text-xs md:text-sm bg-gray-50 border-gray-200 text-gray-700 px-2 py-0.5 md:px-3 md:py-1"
                             >
                               {skill}
                             </Badge>
@@ -484,59 +464,72 @@ export default function DoctorJobsPage() {
                         {job.procedure.length > 3 && (
                           <Badge
                             variant="outline"
-                            className="text-sm bg-slate-50 border-slate-200 text-slate-700 px-3 py-1"
+                            className="text-xs md:text-sm bg-gray-50 border-gray-200 text-gray-700 px-2 py-0.5 md:px-3 md:py-1"
                           >
-                            +{job.procedure.length - 3} more
+                            +{job.procedure.length - 3}
                           </Badge>
                         )}
                       </div>
-                    </div>
 
-                    <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 min-w-[220px] shadow-sm">
-                      <div className="flex items-center mb-4">
-                        <div className="w-6 h-6 rounded-md bg-blue-200 flex items-center justify-center mr-3">
-                          <Clock className="h-4 w-4 text-blue-700" />
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">
-                            Duration
-                          </p>
-                          <p className="font-semibold text-blue-900 text-base">
-                            {`${job.start_time.split(":")[0]}:${
-                              job.start_time.split(":")[1]
-                            } - ${job.end_time.split(":")[0]}:${
-                              job.end_time.split(":")[1]
-                            }`}
-                          </p>
-                        </div>
+                      {/* Break + Gender + Language Tags - Second Row */}
+                      <div className="flex flex-nowrap gap-1 md:gap-2 mb-3 md:mb-4 overflow-x-auto">
+                        {/* Paid/Unpaid Break Tag */}
+                        <Badge
+                          className={cn(
+                            "text-xs md:text-sm font-medium border px-2 py-0.5 md:px-3 md:py-1 whitespace-nowrap",
+                            job.paid_break
+                              ? "bg-green-100 text-green-700 border-green-200"
+                              : "bg-orange-100 text-orange-700 border-orange-200"
+                          )}
+                        >
+                          {job.paid_break ? "Paid Break" : "Unpaid Break"}
+                        </Badge>
+
+                        {/* Gender Preference */}
+                        {job.gender !== "Any" && (
+                          <Badge
+                            className={cn(
+                              "text-xs md:text-sm font-medium border px-2 py-0.5 md:px-3 md:py-1 whitespace-nowrap",
+                              job.gender === "Female"
+                                ? "bg-pink-100 text-pink-700 border-pink-200"
+                                : "bg-blue-100 text-blue-700 border-blue-200"
+                            )}
+                          >
+                            {job.gender}
+                          </Badge>
+                        )}
+
+                        {/* Language Bonus */}
+                        {job.languages && job.languages.length > 0 && (
+                          <>
+                            {job.languages.includes("Chinese") && (
+                              <Badge className="text-xs md:text-sm font-medium border px-2 py-0.5 md:px-3 md:py-1 bg-purple-100 text-purple-700 border-purple-200 whitespace-nowrap">
+                                Chinese Speaking
+                              </Badge>
+                            )}
+                            {job.languages.includes("Tamil") && (
+                              <Badge className="text-xs md:text-sm font-medium border px-2 py-0.5 md:px-3 md:py-1 bg-purple-100 text-purple-700 border-purple-200 whitespace-nowrap">
+                                Tamil Speaking
+                              </Badge>
+                            )}
+                          </>
+                        )}
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="bg-white/70 border border-blue-200 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <DollarSign className="h-4 w-4 text-blue-600 mr-1" />
-                            <p className="text-sm font-medium text-blue-600 uppercase tracking-wide">
-                              Rate
-                            </p>
-                          </div>
-                          <div className="text-lg font-bold text-blue-700">
-                            RM {job.rate}
-                            <span className="text-sm font-medium text-blue-600">
-                              /hr
-                            </span>
-                          </div>
+                      {/* Bottom Row - Rate/Hour and Total Pay */}
+                      <div className="flex items-center gap-2 md:gap-4">
+                        {/* Rate/Hour - More Distinct */}
+                        <div className="bg-green-100 border-2 border-green-300 rounded-lg px-3 py-2 md:px-4 md:py-3 shadow-sm">
+                          <span className="text-sm md:text-lg font-bold text-green-900">
+                            RM{job.rate}/hr
+                          </span>
                         </div>
 
-                        <div className="bg-blue-200/50 border border-blue-300 rounded-lg p-3 text-center">
-                          <div className="flex items-center justify-center mb-2">
-                            <DollarSign className="h-4 w-4 text-blue-700 mr-1" />
-                            <p className="text-sm font-medium text-blue-700 uppercase tracking-wide">
-                              Total
-                            </p>
-                          </div>
-                          <div className="text-lg font-bold text-blue-800">
-                            RM {job.total_pay}++
-                          </div>
+                        {/* Total Pay - Next to Rate */}
+                        <div className="inline-flex items-center px-3 py-1.5 md:px-4 md:py-2 rounded-full border-2 border-red-200 bg-red-50">
+                          <span className="text-sm md:text-lg font-bold text-red-600">
+                            RM{job.total_pay}++
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -550,10 +543,11 @@ export default function DoctorJobsPage() {
             <p className="text-slate-500">
               No jobs match your search criteria.
             </p>
-            <Button variant="outline" className="mt-4" onClick={clearFilters}>
-              Clear Filters
-            </Button>
-            <Button variant="outline" className="mt-4" onClick={clearFilters}>
+            <Button
+              variant="outline"
+              className="mt-4 bg-transparent"
+              onClick={clearFilters}
+            >
               Clear Filters
             </Button>
           </div>

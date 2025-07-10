@@ -6,13 +6,16 @@ import { Search, Download, ArrowUpDown, Heart } from "lucide-react";
 import { useState, useEffect } from "react";
 import axiosInstance from "@/utils/axiosinstance";
 import Link from "next/link";
+import { formatTimeRange } from "@/utils/timeUtils";
+import { useRouter } from "next/navigation";
 
 export default function DashboardPage() {
   const [clinicId, setClinicId] = useState<string | null>(null);
   const [doctors, setDoctors] = useState<any[]>([]);
   const [jobs, setJobs] = useState<any[]>([]);
   const [favoriteDoctors, setFavoriteDoctors] = useState<string[]>([]);
-
+  const router = useRouter();
+  
   // get jobs
   const getJobs = async () => {
     try {
@@ -169,12 +172,8 @@ export default function DashboardPage() {
                   <TableHeader>Time Slot</TableHeader>
                   <TableHeader>Hours</TableHeader>
                   <TableHeader>Pay</TableHeader>
-                  <TableHeader>
-                    Locum Doctor
-                  </TableHeader>
-                  <TableHeader >
-                    Status
-                  </TableHeader>
+                  <TableHeader>Locum Doctor</TableHeader>
+                  <TableHeader>Status</TableHeader>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-purple-100">
@@ -186,6 +185,7 @@ export default function DashboardPage() {
                     <tr
                       key={shift.id}
                       className="hover:bg-blue-100 transition-colors"
+                      
                     >
                       <TableCell>
                         {new Date(shift.date).toLocaleDateString("en-MY", {
@@ -196,14 +196,11 @@ export default function DashboardPage() {
                         })}
                       </TableCell>
                       <TableCell>
-                        {shift.start_time.split(":")[0]}:
-                        {shift.start_time.split(":")[1]} -{" "}
-                        {shift.end_time.split(":")[0]}:
-                        {shift.end_time.split(":")[1]}
+                        {formatTimeRange(shift.start_time, shift.end_time)}
                       </TableCell>
                       <TableCell>{shift.duration}</TableCell>
                       <TableCell>RM {shift.total_pay}</TableCell>
-                      <TableCell >
+                      <TableCell>
                         <div className="flex items-center gap-2">
                           <Link
                             className="hover:underline"
@@ -240,7 +237,7 @@ export default function DashboardPage() {
                           </button>
                         </div>
                       </TableCell>
-                      <TableCell >
+                      <TableCell>
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
                             shift.status === "Completed"

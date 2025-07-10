@@ -36,10 +36,10 @@ app.use(
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 
-async function createNotification({ user_id, user_type, type, title, message }) {
+async function createNotification({ user_id, user_type, type, title, message, job_id }) {
     await pool.query(
-        `INSERT INTO notifications (user_id, user_type, type, title, message) VALUES ($1, $2, $3, $4, $5)`,
-        [user_id, user_type, type, title, message]
+        `INSERT INTO notifications (user_id, user_type, type, title, message, job_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [user_id, user_type, type, title, message, job_id]
     );
 }
 
@@ -169,6 +169,74 @@ app.delete("/api/favorite-doctor", authenticateToken, async (req, res) => {
     }
 });
 
+// check if first time clinic login 
+app.get("/api/clinic-first-time-login/:clinicId", authenticateToken, async (req, res) => {
+    try {
+        const clinicId = req.params.clinicId;
+        const generalInfoResult = await pool.query("SELECT * FROM clinic_general_info WHERE id = $1", [clinicId]);
+        const contactInfoResult = await pool.query("SELECT * FROM clinic_contact_info WHERE id = $1", [clinicId]);
+        const preferencesResult = await pool.query("SELECT * FROM clinic_preferences WHERE id = $1", [clinicId]);
+
+        const isFirstTimeLogin = generalInfoResult.rows.length === 0 || contactInfoResult.rows.length === 0 
+                                || preferencesResult.rows.length === 0;
+
+        return res.status(200).json({error: false, isFirstTimeLogin});
+
+    } catch (error) {
+        return res.status(500).json({error: true, message: "Internal Server Error"});
+    }
+})
+
+// check if first time doctor login 
+app.get("/api/doctor-first-time-login/:doctorId", authenticateToken, async(req, res) => {
+    try {
+        const doctorId = req.params.doctorId;
+        
+        // Get doctor info from doctors table
+        const doctorResult = await pool.query("SELECT name, email FROM doctors WHERE id = $1", [doctorId]);
+        if (doctorResult.rows.length === 0) {
+            return res.status(404).json({error: true, message: "Doctor not found"});
+        }
+        
+        const doctor = doctorResult.rows[0];
+        
+        // Get profile info from doctor_profile table
+        const profileInfoResult = await pool.query("SELECT * FROM doctor_profile WHERE id = $1", [doctorId]);
+        
+        let isFirstTimeLogin = true;
+        
+        if (profileInfoResult.rows.length > 0) {
+            const profile = profileInfoResult.rows[0];
+            
+            // Check if all required fields are filled (based on frontend validation with *)
+            const requiredProfileFields = [
+                'ic', 'address', 'city', 'state', 'postal', 'phone', 'gender', 
+                'birthday', 'bank_name', 'bank_number', 'mmc_number', 'apc_number', 
+                'experience_years', 'mmc_file', 'apc_file'
+            ];
+            
+            const hasAllRequiredFields = requiredProfileFields.every(field => {
+                const value = profile[field];
+                if (field === 'experience_years') {
+                    return value !== null && value !== undefined && value > 0;
+                }
+                return value !== null && value !== undefined && value !== '';
+            });
+            
+            // Also check required fields from doctors table
+            const doctorFieldsComplete = doctor.name && doctor.name.trim() !== '' && 
+                                       doctor.email && doctor.email.trim() !== '';
+            
+            isFirstTimeLogin = !hasAllRequiredFields || !doctorFieldsComplete;
+        }
+        
+        return res.status(200).json({error: false, isFirstTimeLogin});
+    } catch (error) {
+        console.error("Error checking doctor first time login:", error);
+        return res.status(500).json({error: true, message: "Internal Server Error"});
+    }
+})
+
 // Clinic Login API 
 app.post("/api/clinic-login", async (req, res) => {
     const { email, password } = req.body;
@@ -189,13 +257,20 @@ app.post("/api/clinic-login", async (req, res) => {
             return res.status(400).json({ error: true, message: "Invalid email or password" });
         }
 
+        const generalInfoResult = await pool.query("SELECT * FROM clinic_general_info WHERE id = $1", [clinic.id]);
+        const contactInfoResult = await pool.query("SELECT * FROM clinic_contact_info WHERE id = $1", [clinic.id]);
+        const preferencesResult = await pool.query("SELECT * FROM clinic_preferences WHERE id = $1", [clinic.id]);
+
+        const isFirstTimeLogin = generalInfoResult.rows.length === 0 || contactInfoResult.rows.length === 0 
+                                || preferencesResult.rows.length === 0;
+
         const accessToken = jwt.sign({ email: clinic.email }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
         
         res.cookie("token", accessToken, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",
-            maxAge: 60 * 60 * 1000, // 1 hour
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
         });
 
         return res.json({
@@ -204,7 +279,8 @@ app.post("/api/clinic-login", async (req, res) => {
             clinic_name: clinic.clinic_name,
             email: clinic.email,
             accessToken,
-            id: clinic.id
+            id: clinic.id,
+            isFirstTimeLogin
         });
     } catch (err) {
         console.error("Login error:", err);
@@ -257,10 +333,25 @@ app.post("/api/doctor-login", async (req, res) => {
             return res.status(400).json({error: true, message: "email or password does not match"});
         }
 
+        const profileInfoResult = await pool.query("SELECT * FROM doctor_profile WHERE id = $1", [doctor.id]);
+        const isFirstTimeLogin = profileInfoResult.rows.length === 0;
+
         const accessToken = jwt.sign({email: doctor.email}, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '24h' });
 
+        res.cookie("token", accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            sameSite: "lax",
+            maxAge: 24 * 60 * 60 * 1000, // 24 hours
+        });
+
         return res.status(200).json({
-            error: false, message: "Login successful", accessToken, email: doctor.email, id: doctor.id
+            error: false, 
+            message: "Login successful", 
+            accessToken, 
+            email: doctor.email, 
+            id: doctor.id,
+            isFirstTimeLogin
         });
         
     } catch (error) {
@@ -328,7 +419,7 @@ app.patch("/api/edit-job/:jobId", authenticateToken, async(req, res) => {
 
 // Clinic Contact Details API Route 
 app.patch("/api/contact-details/:id", authenticateToken, async (req, res) => {
-    const {address, city, state, postal, phone, website, doctor} = req.body;
+    const {address, city, state, postal, phone, doctor} = req.body;
 
     try {
         const clinicId = req.params.id;
@@ -338,12 +429,12 @@ app.patch("/api/contact-details/:id", authenticateToken, async (req, res) => {
         } 
 
         await pool.query(`
-            INSERT INTO clinic_contact_info (id, address, city, state, postal, phone, website, doctor) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+            INSERT INTO clinic_contact_info (id, address, city, state, postal, phone, doctor) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (id)
-            DO UPDATE SET address = $2, city= $3, state = $4, postal = $5, phone = $6, website = $7, doctor = $8
-            `, [clinicId, address, city, state, postal, phone, website, doctor]);
-        return res.status(200).json({ error: false, message: "contact info updated successfully", address, city, state, postal, phone, website, doctor });
+            DO UPDATE SET address = $2, city= $3, state = $4, postal = $5, phone = $6, doctor = $7
+            `, [clinicId, address, city, state, postal, phone, doctor]);
+        return res.status(200).json({ error: false, message: "contact info updated successfully", address, city, state, postal, phone, doctor });
     } catch (error) {
         console.error(error);
         return res.status(400).json({ error: true, message: "Internal Server Error" });
@@ -396,19 +487,19 @@ app.patch("/api/name-email/:id", authenticateToken, async (req, res) => {
 
 // Clinic Preferences API Route 
 app.patch("/api/preferences/:id", authenticateToken, async (req, res) => {
-    const { qualifications, languages, preferredDoctors, rate, start, end, gender } = req.body;
+    const { qualifications, languages, nightRate, nightRateAvailable, rate, gender } = req.body;
     try {
         const clinicId = req.params.id;
         if (!clinicId) {
             return res.status(400).json({ error: true, message: "Clinic not found" });
         } 
         await pool.query(`
-            INSERT INTO clinic_preferences (id, qualifications, languages, preferred_doctors_only, default_rate, start_time, end_time, gender)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+            INSERT INTO clinic_preferences (id, qualifications, languages, night_rate, night_rate_available, default_rate, gender)
+            VALUES ($1, $2, $3, $4, $5, $6, $7) 
             ON CONFLICT (id)
-            DO UPDATE SET qualifications = $2, languages = $3, preferred_doctors_only = $4, default_rate = $5, start_time = $6, end_time = $7, gender = $8
-            `, [clinicId, qualifications, languages, preferredDoctors, rate, start, end, gender]);
-        return res.status(200).json({ error: false, message: "preferences successfully updated", qualifications, languages, preferredDoctors, rate, start, end, gender });
+            DO UPDATE SET qualifications = $2, languages = $3, night_rate = $4, night_rate_available = $5, default_rate = $6, gender = $7
+            `, [clinicId, qualifications, languages, nightRate, nightRateAvailable, rate, gender]);
+        return res.status(200).json({ error: false, message: "preferences successfully updated", qualifications, languages, nightRate, rate, nightRateAvailable, gender });
     } catch(error) {
         console.error(error);
         return res.status(400).json({error: true, message: "Internal Server Error"});
@@ -428,38 +519,59 @@ app.patch("/api/doctor-profile/:doctorId", authenticateToken, upload.fields([
     const apcFile = req.files?.apcFile?.[0]?.path || null;
 
     const {
-        skills, languages, mmcNumber, apcNumber, specialization, experienceYears, bio
+        skills, languages, mmcNumber, apcNumber, experienceYears, bio
         , IC, address, city, state, postal, phone, gender, birthday, minimumPay,
-        preferredDays, earliestStart, latestEnd, maxDistance, emailNotif, SMSNotif, verified, bank, workExperience
+        preferredDays, earliestStart, latestEnd, maxDistance, bank, workExperience, bankName
     } = req.body;
 
     const parsedSkills = typeof skills === "string" ? JSON.parse(skills) : skills;
     const parsedLanguages = typeof languages === "string" ? JSON.parse(languages) : languages;
     const parsedPreferredDays = typeof preferredDays === "string" ? JSON.parse(preferredDays) : preferredDays;
 
-
     if (!doctorId) {
         return res.status(400).json({ error: true, message: "No doctor found" });
     }
 
     try {
+        // Get existing profile to preserve file paths if no new files uploaded
+        const existingProfile = await pool.query("SELECT profile_pic, mmc_file, apc_file FROM doctor_profile WHERE id = $1", [doctorId]);
+        const existing = existingProfile.rows[0] || {};
+
+        // Use new file paths if uploaded, otherwise keep existing ones
+        const finalProfilePic = profilePic || existing.profile_pic || null;
+        const finalMmcFile = mmcFile || existing.mmc_file || null;
+        const finalApcFile = apcFile || existing.apc_file || null;
+
+        console.log('File update info:', {
+            doctorId,
+            hasNewProfilePic: !!profilePic,
+            hasNewMmcFile: !!mmcFile,
+            hasNewApcFile: !!apcFile,
+            existingProfilePic: existing.profile_pic,
+            existingMmcFile: existing.mmc_file,
+            existingApcFile: existing.apc_file,
+            finalProfilePic,
+            finalMmcFile,
+            finalApcFile
+        });
+
         const values = [
-            parsedSkills, parsedLanguages, mmcNumber, apcNumber, specialization, experienceYears,
+            parsedSkills, parsedLanguages, mmcNumber, apcNumber, experienceYears,
             bio, IC, address, city, state, postal, phone, gender, birthday,
-            minimumPay, parsedPreferredDays, earliestStart, latestEnd, maxDistance, emailNotif, SMSNotif, verified,
-            profilePic, mmcFile, apcFile, bank, workExperience, doctorId
+            minimumPay, parsedPreferredDays, earliestStart, latestEnd, maxDistance,
+            finalProfilePic, finalMmcFile, finalApcFile, bank, workExperience, bankName, doctorId
         ];
 
-        await pool.query(`
+        const result = await pool.query(`
         INSERT INTO doctor_profile (
-            skills, languages, mmc_number, apc_number, specialization, experience_years,
+            skills, languages, mmc_number, apc_number, experience_years,
             bio, ic, address, city, state, postal, phone, gender, birthday,
-            minimum_pay, preferred_days, earliest_start, latest_end, max_distance, email_notif, 
-            sms_notif, verified, profile_pic, mmc_file, apc_file, bank_number, work_experience, id
+            minimum_pay, preferred_days, earliest_start, latest_end, max_distance, 
+            profile_pic, mmc_file, apc_file, bank_number, work_experience, bank_name, id
         ) VALUES (
             $1, $2, $3, $4, $5, $6,
             $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-            $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+            $18, $19, $20, $21, $22, $23, $24, $25, $26
         )
         ON CONFLICT (id)
         DO UPDATE SET
@@ -467,34 +579,39 @@ app.patch("/api/doctor-profile/:doctorId", authenticateToken, upload.fields([
             languages = $2, 
             mmc_number = $3, 
             apc_number = $4, 
-            specialization = $5, 
-            experience_years = $6,
-            bio = $7,  
-            ic = $8, 
-            address = $9, 
-            city = $10, 
-            state = $11, 
-            postal = $12, 
-            phone = $13, 
-            gender = $14, 
-            birthday = $15, 
-            minimum_pay = $16, 
-            preferred_days = $17, 
-            earliest_start = $18,
-            latest_end = $19, 
-            max_distance = $20, 
-            email_notif = $21, 
-            sms_notif = $22,
-            verified = $23,
-            profile_pic = $24,
-            mmc_file = $25,
-            apc_file = $26,
-            bank_number = $27,
-            work_experience = $28
+            experience_years = $5,
+            bio = $6,  
+            ic = $7, 
+            address = $8, 
+            city = $9, 
+            state = $10, 
+            postal = $11, 
+            phone = $12, 
+            gender = $13, 
+            birthday = $14, 
+            minimum_pay = $15, 
+            preferred_days = $16, 
+            earliest_start = $17,
+            latest_end = $18, 
+            max_distance = $19, 
+            profile_pic = $20,
+            mmc_file = $21,
+            apc_file = $22,
+            bank_number = $23,
+            work_experience = $24,
+            bank_name = $25
+        RETURNING profile_pic, mmc_file, apc_file
     `, values); 
 
-
-        return res.status(200).json({ error: false, message: "Doctor profile updated successfully" });
+        return res.status(200).json({ 
+            error: false, 
+            message: "Doctor profile updated successfully",
+            results: {
+                profile_pic: result.rows[0]?.profile_pic,
+                mmc_file: result.rows[0]?.mmc_file,
+                apc_file: result.rows[0]?.apc_file
+            }
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: true, message: "Internal Server Error" });
@@ -516,6 +633,32 @@ app.get("/api/get-doctor-profile/:doctorId", authenticateToken, async (req, res)
     }
 })
 
+// get doctor's accepted jobs 
+app.get("/api/doctor-accepted-jobs/:doctorId", authenticateToken, async (req, res) => {
+    const doctorId = req.params.doctorId;
+    if (!doctorId) {
+        return res.status(400).json({ error: true, message: "No doctor found" });
+    }
+    try {
+        console.log(`Fetching accepted jobs for doctor: ${doctorId}`);
+        const response = await pool.query(
+            `SELECT id, date, start_time, end_time, clinic_id, status 
+             FROM manual_jobs 
+             WHERE doctor_id = $1 AND status = 'Accepted'`, 
+            [doctorId]
+        );
+        console.log(`Found ${response.rows.length} accepted jobs for doctor ${doctorId}`);
+        return res.status(200).json({ 
+            error: false, 
+            message: "Doctor accepted jobs retrieved successfully", 
+            jobs: response.rows 
+        });
+    } catch (error) {
+        console.error("Error fetching doctor accepted jobs:", error);
+        return res.status(500).json({ error: true, message: "Internal Server Error" });
+    }
+})
+
 // change job application status 
 app.patch("/api/update-job-application/:applicationId", authenticateToken, async (req, res) => {
     const applicationId = req.params.applicationId;
@@ -526,82 +669,160 @@ app.patch("/api/update-job-application/:applicationId", authenticateToken, async
     }
 
     try {
-        const result = await pool.query(
-            `UPDATE job_applications SET status = $1 WHERE id = $2 RETURNING *`,
-            [status, applicationId]
+        // Get the application details first
+        const applicationResult = await pool.query(
+            `SELECT * FROM job_applications WHERE id = $1`,
+            [applicationId]
         );
-        if (result.rows.length === 0) {
+        
+        if (applicationResult.rows.length === 0) {
             return res.status(400).json({ error: true, message: "Application not found" });
         }
 
-        const application = result.rows[0];
+        const application = applicationResult.rows[0];
 
         if (status === "Accepted") {
+            // Get the job details
+            const jobResult = await pool.query(
+                `SELECT * FROM manual_jobs WHERE id = $1`,
+                [application.job_id]
+            );
+            const job = jobResult.rows[0];
+
+            // 1. Check if doctor already has a job on the same day with overlapping time
+            const conflictingJobs = await pool.query(
+                `SELECT id FROM manual_jobs 
+                 WHERE doctor_id = $1 
+                   AND date = $2 
+                   AND status = 'Accepted'
+                   AND (
+                        (start_time < $4 AND end_time > $3) OR
+                        (start_time < $3 AND end_time > $3) OR
+                        (start_time < $4 AND end_time > $4) OR
+                        (start_time >= $3 AND end_time <= $4)
+                   )`,
+                [application.doctor_id, job.date, job.start_time, job.end_time]
+            );
+
+            if (conflictingJobs.rows.length > 0) {
+                return res.status(400).json({ 
+                    error: true, 
+                    message: "Doctor already has a conflicting job on this date and time" 
+                });
+            }
+
+            // 2. Accept the application
+            await pool.query(
+                `UPDATE job_applications SET status = $1 WHERE id = $2`,
+                [status, applicationId]
+            );
+
+            // 3. Assign doctor to the job
             await pool.query(
                 `UPDATE manual_jobs SET doctor_id = $1, status = 'Accepted' WHERE id = $2`,
                 [application.doctor_id, application.job_id]
             );
 
-            // 1. Get the accepted job's date, start_time, end_time
-            const jobRes = await pool.query(
-                `SELECT date, start_time, end_time FROM manual_jobs WHERE id = $1`,
-                [application.job_id]
+            // 4. Auto-reject ALL OTHER applications for this SAME JOB
+            await pool.query(
+                `UPDATE job_applications 
+                 SET status = 'Rejected' 
+                 WHERE job_id = $1 AND id != $2 AND status = 'Pending'`,
+                [application.job_id, applicationId]
             );
-            const acceptedJob = jobRes.rows[0];
 
-            // 2. Find all other applications by this doctor on the same date with overlapping time
-            const overlappingApps = await pool.query(
-                `SELECT ja.id, mj.start_time, mj.end_time
+            // 5. Auto-cancel ALL OTHER applications by this doctor for overlapping jobs on the same day
+            console.log(`Checking for overlapping applications for doctor ${application.doctor_id} on date ${job.date} from ${job.start_time} to ${job.end_time}`);
+            const overlappingApplications = await pool.query(
+                `SELECT ja.id, ja.job_id, mj.date, mj.start_time, mj.end_time, mj.clinic_id
                  FROM job_applications ja
                  JOIN manual_jobs mj ON ja.job_id = mj.id
-                 WHERE ja.doctor_id = $1
-                   AND ja.id != $2
-                   AND mj.date = $3
+                 WHERE ja.doctor_id = $1 
+                   AND ja.id != $2 
                    AND ja.status = 'Pending'
+                   AND mj.date = $3
                    AND (
-                        (mj.start_time < $5 AND mj.end_time > $4)
+                        (mj.start_time < $5 AND mj.end_time > $4) OR
+                        (mj.start_time < $4 AND mj.end_time > $4) OR
+                        (mj.start_time < $5 AND mj.end_time > $5) OR
+                        (mj.start_time >= $4 AND mj.end_time <= $5)
                    )`,
-                [
-                    application.doctor_id,
-                    applicationId,
-                    acceptedJob.date,
-                    acceptedJob.start_time,
-                    acceptedJob.end_time
-                ]
+                [application.doctor_id, applicationId, job.date, job.start_time, job.end_time]
             );
 
-            // 3. Delete or update those applications
-            for (const app of overlappingApps.rows) {
+            console.log(`Found ${overlappingApplications.rows.length} overlapping applications to cancel`);
+            // Cancel overlapping applications
+            if (overlappingApplications.rows.length > 0) {
+                const overlappingAppIds = overlappingApplications.rows.map(app => app.id);
                 await pool.query(
-                    `DELETE FROM job_applications WHERE id = $1`,
-                    [app.id]
+                    `UPDATE job_applications 
+                     SET status = 'Cancelled' 
+                     WHERE id = ANY($1)`,
+                    [overlappingAppIds]
                 );
-                // Notify the doctor
+
+                console.log(`Cancelled ${overlappingAppIds.length} overlapping applications:`, overlappingAppIds);
+
+                // Notify doctor about cancelled applications
+                for (const overlappingApp of overlappingApplications.rows) {
+                    await createNotification({
+                        user_id: application.doctor_id,
+                        user_type: 'doctor',
+                        type: 'job_application',
+                        title: 'Application Automatically Cancelled',
+                        message: `Your application for a job on ${new Date(overlappingApp.date).toLocaleDateString()} has been automatically cancelled due to a time conflict with your accepted job.`,
+                        job_id: overlappingApp.job_id
+                    });
+                }
+            }
+
+            // 6. Notify rejected applicants for the same job
+            const rejectedApplicants = await pool.query(
+                `SELECT doctor_id FROM job_applications 
+                 WHERE job_id = $1 AND id != $2 AND status = 'Rejected'`,
+                [application.job_id, applicationId]
+            );
+
+            for (const rejected of rejectedApplicants.rows) {
                 await createNotification({
-                    user_id: application.doctor_id,
-                    user_type: "doctor",
-                    type: "job_unavailable",
-                    title: "Job No Longer Available",
-                    message: `A job you applied for (Job ID: ${application.job_id}) is no longer available due to a scheduling conflict.`
+                    user_id: rejected.doctor_id,
+                    user_type: 'doctor',
+                    type: 'job_application',
+                    title: 'Application Rejected',
+                    message: `Your application for a job on ${new Date(job.date).toLocaleDateString()} has been rejected as another doctor was selected.`,
+                    job_id: application.job_id
                 });
             }
 
+            // 7. Notify the accepted doctor
             await createNotification({
                 user_id: application.doctor_id,
-                user_type: "doctor",
-                type: "accepted",
-                title: "Application Accepted",
-                message: `Your application for Job ID: ${application.job_id} was accepted!`
+                user_type: 'doctor',
+                type: 'job_application',
+                title: 'Application Accepted',
+                message: `Congratulations! Your application for a job on ${new Date(job.date).toLocaleDateString()} has been accepted.`,
+                job_id: application.job_id
             });
-        } else if (status === "Rejected") {
-            // Only clear doctor_id if this doctor is currently assigned
+
+        } else {
+            // For non-acceptance status changes, just update the application
             await pool.query(
-                `UPDATE manual_jobs SET doctor_id = NULL, status = 'posted' WHERE id = $1 AND doctor_id = $2`,
-                [application.job_id, application.doctor_id]
+                `UPDATE job_applications SET status = $1 WHERE id = $2`,
+                [status, applicationId]
             );
         }
 
-        return res.status(200).json({ error: false, message: "Application updated successfully", application: result.rows[0] });
+        // Return the updated application
+        const updatedApplication = await pool.query(
+            `SELECT * FROM job_applications WHERE id = $1`,
+            [applicationId]
+        );
+
+        return res.status(200).json({ 
+            error: false, 
+            message: "Application updated successfully", 
+            application: updatedApplication.rows[0] 
+        });
     } catch (error) {
         console.error(error);
         return res.status(500).json({ error: true, message: "Internal Server Error" });
@@ -611,11 +832,9 @@ app.patch("/api/update-job-application/:applicationId", authenticateToken, async
 // post job 
 app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => {
     const { 
-        jobTitle: title,
         date,
         chosenLanguages: languages,
         chosenProcedure: procedure,
-        preferredDoctors: preferred_doctors,
         address,
         email,
         phone,
@@ -633,7 +852,8 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
         duration,
         shiftType: shift_type,
         breakStart: break_start,
-        breakEnd: break_end
+        breakEnd: break_end,
+        hasBreak: has_break
     } = req.body;
 
     try {
@@ -650,9 +870,9 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
                 clinic_id, procedure, description,
                 incentives, total_pay, date, 
                 start_time, end_time, gender, languages, 
-                preferred_doctors, paid_break,  
+                paid_break,  
                 contact, special_instructions, email, address, phone, status, rate, duration,
-                shift_type, break_start, break_end
+                shift_type, break_start, break_end, has_break
             ) VALUES (
                 $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
                 $11, $12, $13, $14, $15, $16, $17, $18,
@@ -671,7 +891,6 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
             end_time, 
             gender,  
             formattedLanguages, 
-            preferred_doctors,
             paid_break, 
             contact, 
             special_instructions,
@@ -683,7 +902,8 @@ app.post("/api/post-job/:clinicId/jobs", authenticateToken, async (req, res) => 
             duration,
             shift_type,
             break_start,
-            break_end
+            break_end,
+            has_break
         ];
 
         console.log('Executing query:', queryText);
@@ -720,16 +940,27 @@ app.post("/api/post-job-application", authenticateToken, async (req, res) => {
             [job_id, doctor_id, status])
       
         // After job application is inserted
-        const jobRes = await pool.query("SELECT clinic_id FROM manual_jobs WHERE id = $1", [job_id]);
-        if (jobRes.rows.length > 0) {
-            await createNotification({
-                user_id: jobRes.rows[0].clinic_id,
-                user_type: "clinic",
-                type: "application",
-                title: "New Application",
-                message: `A doctor applied for your job (Job ID: ${job_id}).`
-            });
-        }
+       // Get job details for message
+        const jobDetails = await pool.query(
+            "SELECT date, clinic_id FROM manual_jobs WHERE id = $1",
+            [job_id]
+        );
+        const jobInfo = jobDetails.rows[0];
+        const clinicInfo = await pool.query(
+            "SELECT clinic_name FROM clinics WHERE id = $1",
+            [jobInfo.clinic_id]
+        );
+        const clinicName = clinicInfo.rows[0]?.clinic_name || "Clinic";
+        const jobDateMY = new Date(jobInfo.date).toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur" });
+
+        await createNotification({
+            user_id: jobInfo.clinic_id,
+            user_type: "clinic",
+            type: "application",
+            title: "New Application",
+            message: `Locum Doctor job at ${jobDateMY} at ${clinicName}`,
+            job_id: job_id
+        });
 
         return res.status(200).json({error: false,  messsage: "Job application posted successfully", application: result.rows[0]})
         
@@ -1004,12 +1235,25 @@ app.patch("/api/cancel-job/:jobId", authenticateToken, async (req, res) => {
         // After job is set to urgent and doctor removed
         const jobRes = await pool.query("SELECT clinic_id FROM manual_jobs WHERE id = $1", [jobId]);
         if (jobRes.rows.length > 0) {
+            const jobCancelDetails = await pool.query(
+                "SELECT date, clinic_id FROM manual_jobs WHERE id = $1",
+                [jobId]
+            );
+            const jobCancelInfo = jobCancelDetails.rows[0];
+            const clinicCancelInfo = await pool.query(
+                "SELECT clinic_name FROM clinics WHERE id = $1",
+                [jobCancelInfo.clinic_id]
+            );
+            const clinicCancelName = clinicCancelInfo.rows[0]?.clinic_name || "Clinic";
+            const jobCancelDateMY = new Date(jobCancelInfo.date).toLocaleDateString("en-MY", { timeZone: "Asia/Kuala_Lumpur" });
+
             await createNotification({
-                user_id: jobRes.rows[0].clinic_id,
+                user_id: jobCancelInfo.clinic_id,
                 user_type: "clinic",
                 type: "cancellation",
                 title: "Doctor Cancelled",
-                message: `A doctor cancelled their shift for Job ID: ${jobId}.`
+                message: `Locum Doctor job at ${jobCancelDateMY} at ${clinicCancelName}`,
+                job_id: jobId
             });
         }
         return res.status(200).json({ error: false, message: "Job cancelled and set to urgent" });
@@ -1061,6 +1305,20 @@ app.patch("/api/notifications/:id/read", authenticateToken, async (req, res) => 
         console.error(error);
         res.status(500).json({ error: true, message: "Internal Server Error" });
     }
+});
+
+// Logout endpoint to clear authentication cookies
+app.post("/api/logout", (req, res) => {
+    res.clearCookie("token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+    });
+    
+    return res.status(200).json({
+        error: false,
+        message: "Logged out successfully"
+    });
 });
 
 // Start server 
